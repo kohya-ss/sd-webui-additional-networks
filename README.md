@@ -20,7 +20,7 @@ Other networks other than LoRA may be supported in the future.
 
 ## How to use
 
-Open __"Additional Networks"__ dropdown from the left bottom of Web UI,.
+Open __"Additional Networks"__ dropdown from the left bottom of Web UI.
 
 Select __"LoRA"__ for __"Network module 1"__.
 
