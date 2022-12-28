@@ -20,7 +20,7 @@ Other networks other than LoRA may be supported in the future.
 
 ## How to use
 
-Open __"Script"__ dropdown from the left bottom of Web UI, and select __"Additional networks for generating"__.
+Open __"Additional Networks"__ dropdown from the left bottom of Web UI,.
 
 Select __"LoRA"__ for __"Network module 1"__.
 
@@ -52,7 +52,7 @@ LoRAなどのネットワークを元のStable Diffusionに追加し、画像生
 
 ## 使用法
 
-Web UIの左下のほうの __"Script"__ のドロップダウンリストを開き、 __"Additional networks for generating"__ を選びます。
+Web UIの左下のほうの __"Additional Networks"__ のドロップダウンリストを開きます。
 
 __"Network module 1"__ で __"LoRA"__ を選択してください。
 
