@@ -19,20 +19,42 @@ class Script(scripts.Script):
   def title(self):
     return "Additional networks for generating"
 
+  def show(self, is_img2img):
+    return scripts.AlwaysVisible
+
   def ui(self, is_img2img):
     ctrls = []
-    for i in range(5):
-      with gr.Row():
-        module = gr.Dropdown(["LoRA"], label=f"Network module {i+1}", value="LoRA")
-        model = gr.Textbox(label=f"Model {i+1}")
-        weight = gr.Slider(label=f"Weight {i+1}", value=1, minimum=-1.0, maximum=2.0, step=.05)
-      ctrls.extend((module, model, weight))
+    with gr.Group():
+      with gr.Accordion('Additional Networks', open=False):
+        enabled = gr.Checkbox(label='Enable', value=False)
+        ctrls.append(enabled)
+
+        for i in range(5):
+          with gr.Row():
+            module = gr.Dropdown(["LoRA"], label=f"Network module {i+1}", value="LoRA")
+            model = gr.Textbox(label=f"Model {i+1}")
+            weight = gr.Slider(label=f"Weight {i+1}", value=1, minimum=-1.0, maximum=2.0, step=.05)
+          ctrls.extend((module, model, weight))
 
     return ctrls
 
-  def run(self, p, *args):
+  def process(self, p, *args):
+    unet = p.sd_model.model.diffusion_model
+    text_encoder = p.sd_model.cond_stage_model
+
+    def restore_networks():
+      if len(self.latest_networks) > 0:
+        print("restoring last networks")
+        for network, _ in self.latest_networks[::-1]:
+          network.restore(text_encoder, unet)
+        self.latest_networks.clear()
+
+    if not args[0]:
+      restore_networks()
+      return
+
     params = []
-    for i, ctrl in enumerate(args):
+    for i, ctrl in enumerate(args[1:]):
       if i % 3 == 0:
         param = [ctrl]
       else:
@@ -40,23 +62,17 @@ class Script(scripts.Script):
         if i % 3 == 2:
           params.append(param)
 
-    models_changed = False
-
-    unet = p.sd_model.model.diffusion_model
-    text_encoder = p.sd_model.cond_stage_model
-
-    for (l_module, l_model, l_weight), (module, model, weight) in zip(self.latest_params, params):
-      if l_module != module or l_model != model or l_weight != weight:
-        models_changed = True
-        self.latest_params = params
-        break
+    models_changed = (len(self.latest_networks) == 0)                   # no latest network (cleared by check-off)
+    if not models_changed:
+      for (l_module, l_model, l_weight), (module, model, weight) in zip(self.latest_params, params):
+        if l_module != module or l_model != model or l_weight != weight:
+          models_changed = True
+          break
 
     if models_changed:
       print("models are changed")
-      print("restoring last networks")
-      for network, _ in self.latest_networks[::-1]:
-        network.restore(text_encoder, unet)
-      self.latest_networks.clear()
+      restore_networks()
+      self.latest_params = params
 
       print("creating new networks")
       for module, model, weight in self.latest_params:
@@ -66,7 +82,8 @@ class Script(scripts.Script):
           print(f"ignore because weight is 0: {model}")
           continue
         if not os.path.exists(model):
-          return Processed(p, [], info=f"file not found: {model}")
+          print(f"file not found: {model}")
+          continue
 
         print(f"{module} weight: {weight}, model: {model}")
         if module == "LoRA":
@@ -77,7 +94,5 @@ class Script(scripts.Script):
             du_state_dict = torch.load(model, map_location='cpu')
 
           network, info = lora_compvis.create_network_and_apply_compvis(du_state_dict, weight, text_encoder, unet)
-          print(f"model loaded: {info}")
+          print(f"LoRA model {model} loaded: {info}")
           self.latest_networks.append((network, model))
-
-    return process_images(p)
