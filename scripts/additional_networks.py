@@ -62,17 +62,17 @@ class Script(scripts.Script):
         if i % 3 == 2:
           params.append(param)
 
-    models_changed = False
-
-    for (l_module, l_model, l_weight), (module, model, weight) in zip(self.latest_params, params):
-      if l_module != module or l_model != model or l_weight != weight:
-        models_changed = True
-        self.latest_params = params
-        break
-
+    models_changed = (len(self.latest_networks) == 0)                   # no latest network (cleared by check-off)
+    if not models_changed:
+      for (l_module, l_model, l_weight), (module, model, weight) in zip(self.latest_params, params):
+        if l_module != module or l_model != model or l_weight != weight:
+          models_changed = True
+          break
+    
     if models_changed:
       print("models are changed")
       restore_networks()
+      self.latest_params = params
 
       print("creating new networks")
       for module, model, weight in self.latest_params:
