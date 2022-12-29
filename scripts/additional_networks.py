@@ -52,7 +52,7 @@ class Script(scripts.Script):
     if not args[0]:
       restore_networks()
       return
-    
+
     params = []
     for i, ctrl in enumerate(args[1:]):
       if i % 3 == 0:
@@ -68,7 +68,7 @@ class Script(scripts.Script):
         if l_module != module or l_model != model or l_weight != weight:
           models_changed = True
           break
-    
+
     if models_changed:
       print("models are changed")
       restore_networks()
@@ -82,7 +82,8 @@ class Script(scripts.Script):
           print(f"ignore because weight is 0: {model}")
           continue
         if not os.path.exists(model):
-          return Processed(p, [], info=f"file not found: {model}")
+          print(f"file not found: {model}")
+          continue
 
         print(f"{module} weight: {weight}, model: {model}")
         if module == "LoRA":
@@ -93,5 +94,5 @@ class Script(scripts.Script):
             du_state_dict = torch.load(model, map_location='cpu')
 
           network, info = lora_compvis.create_network_and_apply_compvis(du_state_dict, weight, text_encoder, unet)
-          print(f"model loaded: {info}")
+          print(f"LoRA model {model} loaded: {info}")
           self.latest_networks.append((network, model))
