@@ -2,6 +2,14 @@
 
 日本語の文章は下のほうにあります。
 
+## Updates / 更新情報
+
+- Jan 2 2023, 2023/2/1: 
+  - Added support for SD2.x (training scripts has been supported before.) Added error checking to prevent crashes.
+  - SD2.Xへのサポートを追加しました（学習用スクリプトは以前から対応済みです）。拡張が落ちないように事前のエラーチェックを追加しました。
+
+## About
+
 This extension is for [AUTOMATIC1111's Stable Diffusion web UI](https://github.com/AUTOMATIC1111/stable-diffusion-webui), allows the Web UI to add some networks (e.g. LoRA) to the original Stable Diffusion model to generate images. Currently LoRA is supported. The addition is on-the-fly, the merging is not required.
 
 This extension supports the LoRA models (*.ckpt or *.safetensors) trained by our scripts in [sd-scripts](https://github.com/kohya-ss/sd-scripts). The models from other LoRA implementations are not supported.
