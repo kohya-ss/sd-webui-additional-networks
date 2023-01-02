@@ -67,14 +67,16 @@ def create_network_and_apply_compvis(du_state_dict, multiplier, text_encoder, un
       dtype = param.dtype
       break
 
-  # check dims
-  size = du_state_dict[list(du_state_dict.keys())[0]].size()         # in conv2d size is like [320,4,1,1]
+  # get dims from state dict
+  size = du_state_dict[list(du_state_dict.keys())[0]].size()          # if conv2d size is like [320,4,1,1]
   network_dim = min([s for s in size if s > 1])
   print(f"dimension: {network_dim}, multiplier: {multiplier}")
 
+  # create, apply and load weights
   network = LoRANetworkCompvis(text_encoder, unet, multiplier=multiplier, lora_dim=network_dim)
-  state_dict = network.apply_lora_modules(du_state_dict)      # some weights are applied to text encoder
-  info = network.load_state_dict(state_dict)
+  state_dict = network.apply_lora_modules(du_state_dict)              # some weights are applied to text encoder
+  network.to(dtype)                                                   # with this, if error comes from next line, the model will be used
+  info = network.load_state_dict(state_dict, strict=False)
 
   # move to device, change dtype
   network.to(device, dtype=dtype)
@@ -85,13 +87,16 @@ class LoRANetworkCompvis(torch.nn.Module):
   # UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel", "Attention"]
   # TEXT_ENCODER_TARGET_REPLACE_MODULE = ["CLIPAttention", "CLIPMLP"]
   UNET_TARGET_REPLACE_MODULE = ["SpatialTransformer"]  # , "Attention"]
-  TEXT_ENCODER_TARGET_REPLACE_MODULE = ["ResidualAttentionBlock"]
+  TEXT_ENCODER_TARGET_REPLACE_MODULE = ["ResidualAttentionBlock", "CLIPAttention", "CLIPMLP"]
 
   LORA_PREFIX_UNET = 'lora_unet'
   LORA_PREFIX_TEXT_ENCODER = 'lora_te'
 
   @classmethod
   def convert_diffusers_name_to_compvis(cls, v2, du_name):
+    """
+    convert diffusers's LoRA name to CompVis
+    """
     cv_name = None
     if "lora_unet_" in du_name:
       m = re.search(r"_down_blocks_(\d+)_attentions_(\d+)_(.+)", du_name)
@@ -139,6 +144,9 @@ class LoRANetworkCompvis(torch.nn.Module):
 
   @classmethod
   def convert_state_dict_name_to_compvis(cls, v2, state_dict):
+    """
+    convert keys in state dict to load it by load_state_dict
+    """
     new_sd = {}
     for key, value in state_dict.items():
       tokens = key.split('.')
@@ -166,23 +174,24 @@ class LoRANetworkCompvis(torch.nn.Module):
             if child_module.__class__.__name__ == "Linear" or (child_module.__class__.__name__ == "Conv2d" and child_module.kernel_size == (1, 1)):
               lora_name = prefix + '.' + name + '.' + child_name
               lora_name = lora_name.replace('.', '_')
-              if '_resblocks_23_' in lora_name:                           # ignore last block in Text Encoder
+              if '_resblocks_23_' in lora_name:                           # ignore last block in StabilityAi Text Encoder
                 break
               lora = LoRAModule(lora_name, child_module, self.multiplier, self.lora_dim)
               loras.append(lora)
 
               replaced_modules.append(child_module)
             elif child_module.__class__.__name__ == "MultiheadAttention":
-              # make four modules: not replacing the forward but merge weights
+              # make four modules: not replacing forward method but merge weights
               self.v2 = True
               for suffix in ['q', 'k', 'v', 'out']:
                 module_name = prefix + '.' + name + '.' + child_name          # ~.attn
                 module_name = module_name.replace('.', '_')
-                if '_resblocks_23_' in module_name:                           # ignore last block in Text Encoder
+                if '_resblocks_23_' in module_name:                           # ignore last block in StabilityAi Text Encoder
                   break
                 lora_name = module_name + '_' + suffix
                 lora_info = LoRAInfo(lora_name, module_name, child_module, self.multiplier, self.lora_dim)
                 loras.append(lora_info)
+
                 replaced_modules.append(child_module)
       return loras, replaced_modules
 
@@ -194,17 +203,17 @@ class LoRANetworkCompvis(torch.nn.Module):
         LoRANetworkCompvis.LORA_PREFIX_UNET, unet, LoRANetworkCompvis.UNET_TARGET_REPLACE_MODULE)
     print(f"create LoRA for U-Net: {len(self.unet_loras)} modules.")
 
-    # make backup of original forward/weights
-    backed_up = False
+    # make backup of original forward/weights, if multiple modules are applied, do in 1st module onnly
+    backed_up = False                     # messaging purpose only
     for rep_module in te_rep_modules + unet_rep_modules:
       if rep_module.__class__.__name__ == "MultiheadAttention" and not hasattr(rep_module, "_lora_org_weights"):
         rep_module._lora_org_weights = rep_module.state_dict()
         backed_up = True
-      elif not hasattr(rep_module, "_lora_org_forward"):              # 1st model only
+      elif not hasattr(rep_module, "_lora_org_forward"):
         rep_module._lora_org_forward = rep_module.forward
         backed_up = True
     if backed_up:
-      print("original forward is backed up.")
+      print("original forward/weights is backed up.")
 
     # assertion
     names = set()
@@ -213,8 +222,8 @@ class LoRANetworkCompvis(torch.nn.Module):
       names.add(lora.lora_name)
 
   def restore(self, text_encoder, unet):
-    # restore forward from property for all modules
-    restored = False
+    # restore forward/weights from property for all modules
+    restored = False                        # messaging purpose only
     modules = []
     modules.extend(text_encoder.modules())
     modules.extend(unet.modules())
@@ -222,13 +231,14 @@ class LoRANetworkCompvis(torch.nn.Module):
       if hasattr(module, "_lora_org_forward"):
         module.forward = module._lora_org_forward
         del module._lora_org_forward
+        restored = True
       elif hasattr(module, "_lora_org_weights"):
         module.load_state_dict(module._lora_org_weights)
         del module._lora_org_weights
         restored = True
 
     if restored:
-      print("original forward is restored.")
+      print("original forward/weights is restored.")
 
   def apply_lora_modules(self, du_state_dict):
     # conversion 1st step: convert names in state_dict
@@ -257,7 +267,7 @@ class LoRANetworkCompvis(torch.nn.Module):
     else:
       self.unet_loras = []
 
-    # add modules to network: this makes state_dict can be got
+    # add modules to network: this makes state_dict can be got from LoRANetwork
     mha_loras = {}
     for lora in self.text_encoder_loras + self.unet_loras:
       if type(lora) == LoRAModule:
@@ -273,54 +283,66 @@ class LoRANetworkCompvis(torch.nn.Module):
         lora_dic[lora_info.lora_name] = lora_info
         if len(lora_dic) == 4:
           # calculate and apply
-          w_q_dw = state_dict[lora_info.module_name + '_q_proj.lora_down.weight']
-          w_q_up = state_dict[lora_info.module_name + '_q_proj.lora_up.weight']
-          w_k_dw = state_dict[lora_info.module_name + '_k_proj.lora_down.weight']
-          w_k_up = state_dict[lora_info.module_name + '_k_proj.lora_up.weight']
-          w_v_dw = state_dict[lora_info.module_name + '_v_proj.lora_down.weight']
-          w_v_up = state_dict[lora_info.module_name + '_v_proj.lora_up.weight']
-          w_out_dw = state_dict[lora_info.module_name + '_out_proj.lora_down.weight']
-          w_out_up = state_dict[lora_info.module_name + '_out_proj.lora_up.weight']
+          w_q_dw = state_dict.get(lora_info.module_name + '_q_proj.lora_down.weight')
+          if w_q_dw is not None:                       # corresponding LoRa module exists 
+            w_q_up = state_dict[lora_info.module_name + '_q_proj.lora_up.weight']
+            w_k_dw = state_dict[lora_info.module_name + '_k_proj.lora_down.weight']
+            w_k_up = state_dict[lora_info.module_name + '_k_proj.lora_up.weight']
+            w_v_dw = state_dict[lora_info.module_name + '_v_proj.lora_down.weight']
+            w_v_up = state_dict[lora_info.module_name + '_v_proj.lora_up.weight']
+            w_out_dw = state_dict[lora_info.module_name + '_out_proj.lora_down.weight']
+            w_out_up = state_dict[lora_info.module_name + '_out_proj.lora_up.weight']
 
-          sd = lora_info.module.state_dict()
-          qkv_weight = sd['in_proj_weight']
-          out_weight = sd['out_proj.weight']
-          dev = qkv_weight.device
+            sd = lora_info.module.state_dict()
+            qkv_weight = sd['in_proj_weight']
+            out_weight = sd['out_proj.weight']
+            dev = qkv_weight.device
 
-          def merge_weights(weight, up_weight, down_weight):
-            return weight + lora_info.multiplier * (up_weight.to(dev) @ down_weight.to(dev))
+            def merge_weights(weight, up_weight, down_weight):
+              # calculate in float
+              dtype = weight.dtype
+              weight = weight.float() + lora_info.multiplier * (up_weight.to(dev, dtype=torch.float) @ down_weight.to(dev, dtype=torch.float))
+              weight = weight.to(dtype)
+              return weight
 
-          q_weight, k_weight, v_weight = torch.chunk(qkv_weight, 3)
-          q_weight = merge_weights(q_weight, w_q_up, w_q_dw)
-          k_weight = merge_weights(k_weight, w_k_up, w_k_dw)
-          v_weight = merge_weights(v_weight, w_v_up, w_v_dw)
-          qkv_weight = torch.cat([q_weight, k_weight, v_weight])
+            q_weight, k_weight, v_weight = torch.chunk(qkv_weight, 3)
+            if q_weight.size()[1] == w_q_up.size()[0]:
+              q_weight = merge_weights(q_weight, w_q_up, w_q_dw)
+              k_weight = merge_weights(k_weight, w_k_up, w_k_dw)
+              v_weight = merge_weights(v_weight, w_v_up, w_v_dw)
+              qkv_weight = torch.cat([q_weight, k_weight, v_weight])
 
-          out_weight = merge_weights(out_weight, w_out_up, w_out_dw)
+              out_weight = merge_weights(out_weight, w_out_up, w_out_dw)
 
-          sd['in_proj_weight'] = qkv_weight.to(dev)
-          sd['out_proj.weight'] = out_weight.to(dev)
+              sd['in_proj_weight'] = qkv_weight.to(dev)
+              sd['out_proj.weight'] = out_weight.to(dev)
 
-          lora_info.module.load_state_dict(sd)
-          # print(f"weights are merged into {lora_info.module_name}")
+              lora_info.module.load_state_dict(sd)
+            else:
+              # different dim, version mismatch
+              print(f"shape of weight is different: {lora_info.module_name}. SD version may be different")
 
-          for v in ["q", "k", "v", "out"]:
-            del state_dict[f"{lora_info.module_name}_{v}_proj.lora_down.weight"]
-            del state_dict[f"{lora_info.module_name}_{v}_proj.lora_up.weight"]
+            for t in ["q", "k", "v", "out"]:
+              del state_dict[f"{lora_info.module_name}_{t}_proj.lora_down.weight"]
+              del state_dict[f"{lora_info.module_name}_{t}_proj.lora_up.weight"]
+          else:
+            # corresponding weight not exists: version mismatch
+            pass
 
-    # conversion 2nd step: convert shape (and handle wrapped)
+
+    # conversion 2nd step: convert weight's shape (and handle wrapped)
     state_dict = self.convert_state_dict_shape_to_compvis(state_dict)
 
     return state_dict
 
   def convert_state_dict_shape_to_compvis(self, state_dict):
     # shape conversion
-    current_sd = self.state_dict()
+    current_sd = self.state_dict()        # to get target shape
     wrapped = False
     count = 0
     for key in list(state_dict.keys()):
       if key not in current_sd:
-        continue                        # might be error or another version
+        continue                          # might be error or another version
       if "wrapped" in key:
         wrapped = True
 
@@ -333,6 +355,9 @@ class LoRANetworkCompvis(torch.nn.Module):
         else:
           value = value.unsqueeze(2).unsqueeze(3)
         state_dict[key] = value
+      if tuple(value.size()) != tuple(current_sd[key].size()):
+        print(f"weight's shape is different: {key} expected {current_sd[key].size()} found {value.size()}. SD version may be different")
+        del state_dict[key]
     print(f"shapes for {count} weights are converted.")
 
     # convert wrapped
