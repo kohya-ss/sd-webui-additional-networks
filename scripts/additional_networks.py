@@ -15,6 +15,7 @@ class Script(scripts.Script):
     super().__init__()
     self.latest_params = [(None, None, None)] * 5
     self.latest_networks = []
+    self.latest_model_hash = ""
 
   def title(self):
     return "Additional networks for generating"
@@ -63,6 +64,7 @@ class Script(scripts.Script):
           params.append(param)
 
     models_changed = (len(self.latest_networks) == 0)                   # no latest network (cleared by check-off)
+    models_changed = models_changed or self.latest_model_hash != p.sd_model.sd_model_hash
     if not models_changed:
       for (l_module, l_model, l_weight), (module, model, weight) in zip(self.latest_params, params):
         if l_module != module or l_model != model or l_weight != weight:
@@ -70,9 +72,10 @@ class Script(scripts.Script):
           break
 
     if models_changed:
-      print("models are changed")
+      print("models (or sd model) are changed")
       restore_networks()
       self.latest_params = params
+      self.latest_model_hash = p.sd_model.sd_model_hash
 
       print("creating new networks")
       for module, model, weight in self.latest_params:
@@ -81,6 +84,9 @@ class Script(scripts.Script):
         if weight <= 0:
           print(f"ignore because weight is 0: {model}")
           continue
+
+        if model.startswith("\"") and model.endswith("\""):             # trim '"' at start/end
+          model = model[1:-1]
         if not os.path.exists(model):
           print(f"file not found: {model}")
           continue
