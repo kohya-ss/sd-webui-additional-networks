@@ -4,7 +4,7 @@
 
 ## Updates / 更新情報
 
-- Jan 2 2023, 2023/2/1: 
+- Jan 2 2023, 2023/1/2: 
   - Added support for SD2.x (training scripts has been supported before.) Added error checking to prevent crashes.
   - SD2.Xへのサポートを追加しました（学習用スクリプトは以前から対応済みです）。拡張が落ちないように事前のエラーチェックを追加しました。
 
