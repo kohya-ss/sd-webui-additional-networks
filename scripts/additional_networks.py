@@ -9,7 +9,11 @@ from modules.processing import Processed, process_images
 
 from scripts import lora_compvis
 
-from tkinter import filedialog, Tk
+try:
+  from tkinter import filedialog, Tk
+  tkinter_found = True
+except ImportError:
+  tkinter_found = False
 
 
 class Script(scripts.Script):
@@ -26,6 +30,9 @@ class Script(scripts.Script):
     return scripts.AlwaysVisible
   
   def get_any_file_path(file_path=''):
+    if not tkinter_found:
+      return "tkinter not found"
+
     current_file_path = file_path
     # print(f'current file path: {current_file_path}')
 
