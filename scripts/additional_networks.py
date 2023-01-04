@@ -29,7 +29,7 @@ class Script(scripts.Script):
   def show(self, is_img2img):
     return scripts.AlwaysVisible
   
-  def get_any_file_path(file_path=''):
+  def get_any_file_path(self, file_path=''):
     if not tkinter_found:
       return "tkinter not found"
 
@@ -62,7 +62,7 @@ class Script(scripts.Script):
             model_file = gr.Button(
                 '📂', elem_id='open_folder'
             )
-            model_file.click(self.get_any_file_path, outputs=model)
+            model_file.click(self.get_any_file_path, inputs=model, outputs=model)
             weight = gr.Slider(label=f"Weight {i+1}", value=1, minimum=-1.0, maximum=2.0, step=.05)
           ctrls.extend((module, model, weight))
 
