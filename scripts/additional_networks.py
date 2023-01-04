@@ -25,17 +25,14 @@ class Script(scripts.Script):
   def show(self, is_img2img):
     return scripts.AlwaysVisible
   
-  def get_file_path(file_path='', defaultextension='.json'):
+  def get_any_file_path(file_path=''):
     current_file_path = file_path
     # print(f'current file path: {current_file_path}')
 
     root = Tk()
     root.wm_attributes('-topmost', 1)
     root.withdraw()
-    file_path = filedialog.askopenfilename(
-        filetypes=(('Config files', '*.json'), ('All files', '*')),
-        defaultextension=defaultextension,
-    )
+    file_path = filedialog.askopenfilename()
     root.destroy()
 
     if file_path == '':
@@ -56,11 +53,9 @@ class Script(scripts.Script):
             model = gr.Textbox(label=f"Model {i+1}")
             
             model_file = gr.Button(
-                '📂', elem_id='open_file_small'
+                '📂', elem_id='open_folder'
             )
-            model_file.click(
-                get_file_path, outputs=model
-            )
+            model_file.click(self.get_any_file_path, outputs=model)
             weight = gr.Slider(label=f"Weight {i+1}", value=1, minimum=-1.0, maximum=2.0, step=.05)
           ctrls.extend((module, model, weight))
 
