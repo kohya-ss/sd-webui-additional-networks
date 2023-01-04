@@ -94,12 +94,10 @@ class Script(scripts.Script):
           break
 
     if models_changed:
-      print("models (or sd model) are changed")
       restore_networks()
       self.latest_params = params
       self.latest_model_hash = p.sd_model.sd_model_hash
 
-      print("creating new networks")
       for module, model, weight in self.latest_params:
         if model is None or len(model) == 0:
           continue
@@ -124,3 +122,5 @@ class Script(scripts.Script):
           network, info = lora_compvis.create_network_and_apply_compvis(du_state_dict, weight, text_encoder, unet)
           print(f"LoRA model {model} loaded: {info}")
           self.latest_networks.append((network, model))
+      if len(self.latest_networks) > 0:
+        print("setting (or sd model) changed. new networks created.")
