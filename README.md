@@ -4,6 +4,9 @@
 
 ## Updates / 更新情報
 
+- Jan 5 2023, 2023/1/5: 
+  - Added folder icon for easy LoRA selection. Fixed negative weights are not working.
+  - ファイル選択ダイアログを開くアイコンを追加しました。負の重みを設定しても動かない不具合を修正しました。
 - Jan 2 2023, 2023/1/2: 
   - Added support for SD2.x (training scripts has been supported before.) Added error checking to prevent crashes.
   - SD2.Xへのサポートを追加しました（学習用スクリプトは以前から対応済みです）。拡張が落ちないように事前のエラーチェックを追加しました。
