@@ -9,6 +9,12 @@ from modules.processing import Processed, process_images
 
 from scripts import lora_compvis
 
+try:
+  from tkinter import filedialog, Tk
+  tkinter_found = True
+except ImportError:
+  tkinter_found = False
+
 
 class Script(scripts.Script):
   def __init__(self) -> None:
@@ -22,6 +28,24 @@ class Script(scripts.Script):
 
   def show(self, is_img2img):
     return scripts.AlwaysVisible
+  
+  def get_any_file_path(self, file_path=''):
+    if not tkinter_found:
+      return "tkinter not found"
+
+    current_file_path = file_path
+    # print(f'current file path: {current_file_path}')
+
+    root = Tk()
+    root.wm_attributes('-topmost', 1)
+    root.withdraw()
+    file_path = filedialog.askopenfilename()
+    root.destroy()
+
+    if file_path == '':
+        file_path = current_file_path
+
+    return file_path
 
   def ui(self, is_img2img):
     ctrls = []
@@ -34,6 +58,11 @@ class Script(scripts.Script):
           with gr.Row():
             module = gr.Dropdown(["LoRA"], label=f"Network module {i+1}", value="LoRA")
             model = gr.Textbox(label=f"Model {i+1}")
+            
+            model_file = gr.Button(
+                '📂', elem_id='open_folder'
+            )
+            model_file.click(self.get_any_file_path, inputs=model, outputs=model)
             weight = gr.Slider(label=f"Weight {i+1}", value=1, minimum=-1.0, maximum=2.0, step=.05)
           ctrls.extend((module, model, weight))
 
@@ -72,16 +101,14 @@ class Script(scripts.Script):
           break
 
     if models_changed:
-      print("models (or sd model) are changed")
       restore_networks()
       self.latest_params = params
       self.latest_model_hash = p.sd_model.sd_model_hash
 
-      print("creating new networks")
       for module, model, weight in self.latest_params:
         if model is None or len(model) == 0:
           continue
-        if weight <= 0:
+        if weight == 0:
           print(f"ignore because weight is 0: {model}")
           continue
 
@@ -102,3 +129,5 @@ class Script(scripts.Script):
           network, info = lora_compvis.create_network_and_apply_compvis(du_state_dict, weight, text_encoder, unet)
           print(f"LoRA model {model} loaded: {info}")
           self.latest_networks.append((network, model))
+      if len(self.latest_networks) > 0:
+        print("setting (or sd model) changed. new networks created.")
