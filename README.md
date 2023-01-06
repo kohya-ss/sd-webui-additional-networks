@@ -4,6 +4,9 @@
 
 ## Updates / 更新情報
 
+- Jan 6 2023, 2023/1/6: 
+  - Fixed a bug that broke the model were broken when switching enable->disable->enable...
+  - SD 2.xのモデルで有効・無効を繰り返し切り替えるとモデルが壊れていく不具合を修正しました。
 - Jan 5 2023, 2023/1/5: 
   - Added folder icon for easy LoRA selection. Fixed negative weights are not working.
   - ファイル選択ダイアログを開くアイコンを追加しました。負の重みを設定しても動かない不具合を修正しました。
