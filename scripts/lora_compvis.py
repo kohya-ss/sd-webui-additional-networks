@@ -3,6 +3,7 @@
 # https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
 # https://github.com/cloneofsimo/lora/blob/master/lora_diffusion/lora.py
 
+import copy
 import math
 import os
 import re
@@ -206,9 +207,10 @@ class LoRANetworkCompvis(torch.nn.Module):
     # make backup of original forward/weights, if multiple modules are applied, do in 1st module onnly
     backed_up = False                     # messaging purpose only
     for rep_module in te_rep_modules + unet_rep_modules:
-      if rep_module.__class__.__name__ == "MultiheadAttention" and not hasattr(rep_module, "_lora_org_weights"):
-        rep_module._lora_org_weights = rep_module.state_dict()
-        backed_up = True
+      if rep_module.__class__.__name__ == "MultiheadAttention":      # multiple modules in list, prevent to backed up forward
+        if not hasattr(rep_module, "_lora_org_weights"):
+          rep_module._lora_org_weights = copy.deepcopy(rep_module.state_dict())    # avoid updating, state_dict is reference to original weights
+          backed_up = True
       elif not hasattr(rep_module, "_lora_org_forward"):
         rep_module._lora_org_forward = rep_module.forward
         backed_up = True
@@ -232,7 +234,7 @@ class LoRANetworkCompvis(torch.nn.Module):
         module.forward = module._lora_org_forward
         del module._lora_org_forward
         restored = True
-      elif hasattr(module, "_lora_org_weights"):
+      if hasattr(module, "_lora_org_weights"):        # module doesn't have forward and weights at same time currently, but supports it for future changing
         module.load_state_dict(module._lora_org_weights)
         del module._lora_org_weights
         restored = True
