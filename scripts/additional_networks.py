@@ -28,7 +28,7 @@ class Script(scripts.Script):
 
   def show(self, is_img2img):
     return scripts.AlwaysVisible
-  
+
   def get_any_file_path(self, file_path=''):
     if not tkinter_found:
       return "tkinter not found"
@@ -43,7 +43,7 @@ class Script(scripts.Script):
     root.destroy()
 
     if file_path == '':
-        file_path = current_file_path
+      file_path = current_file_path
 
     return file_path
 
@@ -58,7 +58,7 @@ class Script(scripts.Script):
           with gr.Row():
             module = gr.Dropdown(["LoRA"], label=f"Network module {i+1}", value="LoRA")
             model = gr.Textbox(label=f"Model {i+1}")
-            
+
             model_file = gr.Button(
                 '📂', elem_id='open_folder'
             )
@@ -127,6 +127,8 @@ class Script(scripts.Script):
             du_state_dict = torch.load(model, map_location='cpu')
 
           network, info = lora_compvis.create_network_and_apply_compvis(du_state_dict, weight, text_encoder, unet)
+          network.to(p.sd_model.device, dtype=p.sd_model.dtype)         # in medvram, device is different for u-net and sd_model, so use sd_model's
+
           print(f"LoRA model {model} loaded: {info}")
           self.latest_networks.append((network, model))
       if len(self.latest_networks) > 0:
