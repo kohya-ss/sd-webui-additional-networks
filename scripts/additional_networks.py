@@ -127,6 +127,7 @@ class Script(scripts.Script):
             du_state_dict = torch.load(model, map_location='cpu')
 
           network, info = lora_compvis.create_network_and_apply_compvis(du_state_dict, weight, text_encoder, unet)
+          network.to(p.sd_model.device, dtype=p.sd_model.dtype)
           print(f"LoRA model {model} loaded: {info}")
           self.latest_networks.append((network, model))
       if len(self.latest_networks) > 0:
