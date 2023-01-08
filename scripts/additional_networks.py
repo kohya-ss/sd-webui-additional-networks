@@ -95,18 +95,21 @@ class Script(scripts.Script):
     return ctrls
 
   def set_infotext_fields(self, p, params):
-    p.extra_generation_params.update({
-        "AddNet Enabled": True
-    })
+    found_any = False
     for i, t in enumerate(params):
       module, model, weight = t
       if model is None or model == "None" or len(model) == 0 or weight == 0:
         continue
+      found_any = True
       p.extra_generation_params.update({
         f"AddNet Module {i+1}": module,
         f"AddNet Model {i+1}": model,
         f"AddNet Weight {i+1}": weight,
        })
+    if found_any:
+      p.extra_generation_params.update({
+        "AddNet Enabled": True
+      })
 
   def process(self, p, *args):
     unet = p.sd_model.model.diffusion_model
