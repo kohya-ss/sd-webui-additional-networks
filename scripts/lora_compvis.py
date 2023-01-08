@@ -64,7 +64,7 @@ def create_network_and_apply_compvis(du_state_dict, multiplier, text_encoder, un
   for module in unet.modules():
     if module.__class__.__name__ == "Linear":
       param: torch.nn.Parameter = module.weight
-      device = param.device
+      # device = param.device
       dtype = param.dtype
       break
 
@@ -76,11 +76,9 @@ def create_network_and_apply_compvis(du_state_dict, multiplier, text_encoder, un
   # create, apply and load weights
   network = LoRANetworkCompvis(text_encoder, unet, multiplier=multiplier, lora_dim=network_dim)
   state_dict = network.apply_lora_modules(du_state_dict)              # some weights are applied to text encoder
-  network.to(dtype)                                                   # with this, if error comes from next line, the model will be used
+  network.to(dtype)                                              # with this, if error comes from next line, the model will be used
   info = network.load_state_dict(state_dict, strict=False)
 
-  # move to device, change dtype
-  network.to(device, dtype=dtype)
   return network, info
 
 
@@ -209,7 +207,8 @@ class LoRANetworkCompvis(torch.nn.Module):
     for rep_module in te_rep_modules + unet_rep_modules:
       if rep_module.__class__.__name__ == "MultiheadAttention":      # multiple modules in list, prevent to backed up forward
         if not hasattr(rep_module, "_lora_org_weights"):
-          rep_module._lora_org_weights = copy.deepcopy(rep_module.state_dict())    # avoid updating, state_dict is reference to original weights
+          # avoid updating, state_dict is reference to original weights
+          rep_module._lora_org_weights = copy.deepcopy(rep_module.state_dict())
           backed_up = True
       elif not hasattr(rep_module, "_lora_org_forward"):
         rep_module._lora_org_forward = rep_module.forward
@@ -286,7 +285,7 @@ class LoRANetworkCompvis(torch.nn.Module):
         if len(lora_dic) == 4:
           # calculate and apply
           w_q_dw = state_dict.get(lora_info.module_name + '_q_proj.lora_down.weight')
-          if w_q_dw is not None:                       # corresponding LoRa module exists 
+          if w_q_dw is not None:                       # corresponding LoRa module exists
             w_q_up = state_dict[lora_info.module_name + '_q_proj.lora_up.weight']
             w_k_dw = state_dict[lora_info.module_name + '_k_proj.lora_down.weight']
             w_k_up = state_dict[lora_info.module_name + '_k_proj.lora_up.weight']
@@ -331,7 +330,6 @@ class LoRANetworkCompvis(torch.nn.Module):
             # corresponding weight not exists: version mismatch
             pass
 
-
     # conversion 2nd step: convert weight's shape (and handle wrapped)
     state_dict = self.convert_state_dict_shape_to_compvis(state_dict)
 
@@ -358,7 +356,8 @@ class LoRANetworkCompvis(torch.nn.Module):
           value = value.unsqueeze(2).unsqueeze(3)
         state_dict[key] = value
       if tuple(value.size()) != tuple(current_sd[key].size()):
-        print(f"weight's shape is different: {key} expected {current_sd[key].size()} found {value.size()}. SD version may be different")
+        print(
+            f"weight's shape is different: {key} expected {current_sd[key].size()} found {value.size()}. SD version may be different")
         del state_dict[key]
     print(f"shapes for {count} weights are converted.")
 
