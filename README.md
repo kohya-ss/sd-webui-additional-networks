@@ -4,6 +4,9 @@
 
 ## Updates / 更新情報
 
+- Jan 8 2023, 2023/1/8: 
+  - Supports medvram/lowvram in web UI. Thanks for ddvarpdd!
+  - Web UI に medvram/lowvram オプションを付けた場合でも動作するよう修正しました。ddvarpdd 氏に感謝します。
 - Jan 6 2023, 2023/1/6: 
   - Fixed a bug that broke the model were broken when switching enable->disable->enable...
   - SD 2.x のモデルで有効・無効を繰り返し切り替えるとモデルが壊れていく不具合を修正しました。
