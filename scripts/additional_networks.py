@@ -5,6 +5,7 @@ from collections import OrderedDict
 import torch
 
 import modules.scripts as scripts
+from modules import shared, script_callbacks
 import gradio as gr
 
 from modules.processing import Processed, process_images
@@ -24,12 +25,17 @@ os.makedirs(lora_models_dir, exist_ok=True)
 def update_lora_models():
   global lora_models
   res = {}
-  for ext in LORA_MODEL_EXTS:
-    for filename in sorted(glob.iglob(os.path.join(lora_models_dir, f"**/*.{ext}"), recursive=True)):
-      name = os.path.splitext(os.path.basename(filename))[0]
-      # Prevent a hypothetical "None.pt" from being listed.
-      if name != "None":
-        res[name + f"({sd_models.model_hash(filename)})"] = filename
+  paths = [lora_models_dir]
+  extra_lora_path = shared.opts.data.get("additional_networks_extra_lora_path", None)
+  if extra_lora_path and os.path.exists(extra_lora_path):
+    paths.append(extra_lora_path)
+  for path in paths:
+    for ext in LORA_MODEL_EXTS:
+      for filename in sorted(glob.iglob(os.path.join(path, f"**/*.{ext}"), recursive=True)):
+        name = os.path.splitext(os.path.basename(filename))[0]
+        # Prevent a hypothetical "None.pt" from being listed.
+        if name != "None":
+          res[name + f"({sd_models.model_hash(filename)})"] = filename
   lora_models = OrderedDict(**{"None": None}, **res)
 
 
@@ -62,7 +68,7 @@ class Script(scripts.Script):
         for i in range(MAX_MODEL_COUNT):
           with gr.Row():
             module = gr.Dropdown(["LoRA"], label=f"Network module {i+1}", value="LoRA")
-            model = gr.Dropdown(list(lora_models.keys()),
+            model = gr.Dropdown(sorted(lora_models.keys()),
                                           label=f"Model {i+1}",
                                           value="None")
 
@@ -84,7 +90,7 @@ class Script(scripts.Script):
               selected = dd
             else:
               selected = "None"
-            update = gr.Dropdown.update(value=selected, choices=list(lora_models.keys()))
+            update = gr.Dropdown.update(value=selected, choices=sorted(lora_models.keys()))
             updates.append(update)
           return updates
 
@@ -95,21 +101,16 @@ class Script(scripts.Script):
     return ctrls
 
   def set_infotext_fields(self, p, params):
-    found_any = False
     for i, t in enumerate(params):
       module, model, weight = t
       if model is None or model == "None" or len(model) == 0 or weight == 0:
         continue
-      found_any = True
       p.extra_generation_params.update({
+        "AddNet Enabled": True,
         f"AddNet Module {i+1}": module,
         f"AddNet Model {i+1}": model,
         f"AddNet Weight {i+1}": weight,
        })
-    if found_any:
-      p.extra_generation_params.update({
-        "AddNet Enabled": True
-      })
 
   def process(self, p, *args):
     unet = p.sd_model.model.diffusion_model
@@ -183,3 +184,11 @@ class Script(scripts.Script):
         print("setting (or sd model) changed. new networks created.")
 
     self.set_infotext_fields(p, self.latest_params)
+
+
+def on_ui_settings():
+    section = ('additional_networks', "Additional Networks")
+    shared.opts.add_option("additional_networks_extra_lora_path", shared.OptionInfo("", "Extra path to scan for LoRA models (e.g. training output directory)", section=section))
+
+
+script_callbacks.on_ui_settings(on_ui_settings)
