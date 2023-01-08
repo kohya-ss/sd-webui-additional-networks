@@ -15,20 +15,22 @@ from scripts import lora_compvis
 
 
 MAX_MODEL_COUNT = 5
+LORA_MODEL_EXTS = ["pt", "ckpt", "safetensors"]
 lora_models = {}
 lora_models_dir = os.path.join(scripts.basedir(), "models/LoRA")
 os.makedirs(lora_models_dir, exist_ok=True)
 
 
 def update_lora_models():
-    global lora_models
-    res = {}
-    for filename in sorted(glob.iglob(os.path.join(lora_models_dir, '**/*.pt'), recursive=True)):
-        name = os.path.splitext(os.path.basename(filename))[0]
-        # Prevent a hypothetical "None.pt" from being listed.
-        if name != "None":
-            res[name + f"({sd_models.model_hash(filename)})"] = filename
-    lora_models = OrderedDict(**{"None": None}, **res)
+  global lora_models
+  res = {}
+  for ext in LORA_MODEL_EXTS:
+    for filename in sorted(glob.iglob(os.path.join(lora_models_dir, f"**/*.{ext}"), recursive=True)):
+      name = os.path.splitext(os.path.basename(filename))[0]
+      # Prevent a hypothetical "None.pt" from being listed.
+      if name != "None":
+        res[name + f"({sd_models.model_hash(filename)})"] = filename
+  lora_models = OrderedDict(**{"None": None}, **res)
 
 
 update_lora_models()
