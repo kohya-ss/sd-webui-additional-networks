@@ -4,18 +4,28 @@
 
 ## Updates / 更新情報
 
+- Jan 9 2023
+  - The method of selecting a model has changed.
+  - __Place models files in the folder  ``extensions\sd-webui-additional-networks\models\lora``__
+    - All models, including in subfolders, are listed in the drop-down.
+    - You can add an extra folder at ``Settings`` tab -> ``Additional Networks`` on left bottom -> ``Extra path to scan for LoRA models:``
+  - Generated PNGs now have settings about LoRA in the infotext, which can be restored by sending it from ``PNG Info`` tab by ``txt2img`` button.
+  - Thanks to space-nuko for this great contribution!
+
+ - 2023/1/9:
+    - モデル選択方法が変わりました。
+    - __モデルファイルを Web UI の``extensions\sd-webui-additional-networks\models\lora`` フォルダに置いてください。__
+      - サブフォルダにあるものも含めすべてのモデルがドロップダウンに表示されます。
+      - スキャンするフォルダを追加できます。 ``Settings`` タブの ``Additional Networks`` （左下にあります）を選択し、 ``Extra path to scan for LoRA models:`` で設定してください。
+    - 生成された PNG の infotext に設定が保存されるようになりました。  ``PNG Info`` タブから ``txt2img`` ボタンで復元されます。
+    - 素晴らしいプルリクをいただいた space-nuko 氏に感謝します。
+
 - Jan 8 2023, 2023/1/8: 
   - Supports medvram/lowvram in web UI. Thanks for ddvarpdd!
   - Web UI に medvram/lowvram オプションを付けた場合でも動作するよう修正しました。ddvarpdd 氏に感謝します。
 - Jan 6 2023, 2023/1/6: 
   - Fixed a bug that broke the model were broken when switching enable->disable->enable...
   - SD 2.x のモデルで有効・無効を繰り返し切り替えるとモデルが壊れていく不具合を修正しました。
-- Jan 5 2023, 2023/1/5: 
-  - Added folder icon for easy LoRA selection. Fixed negative weights are not working.
-  - ファイル選択ダイアログを開くアイコンを追加しました。負の重みを設定しても動かない不具合を修正しました。
-- Jan 2 2023, 2023/1/2: 
-  - Added support for SD2.x (training scripts has been supported before.) Added error checking to prevent crashes.
-  - SD2.X へのサポートを追加しました（学習用スクリプトは以前から対応済みです）。拡張が落ちないように事前のエラーチェックを追加しました。
 
 ## About
 
