@@ -269,14 +269,22 @@ def on_ui_tabs():
   with gr.Blocks(analytics_enabled=False) as additional_networks_interface:
     with gr.Row().style(equal_height=False):
       with gr.Column(variant='panel'):
-        gr.HTML(value="Inspect additional network metadata")
-
         with gr.Row():
-          module = gr.Dropdown(["LoRA"], label=f"Network module", value="LoRA", interactive=True)
+          module = gr.Dropdown(["LoRA"], label=f"Network module (used throughout this tab)", value="LoRA", interactive=True)
           model = gr.Dropdown(list(lora_models.keys()), label=f"Model", value="None", interactive=True)
           modules.ui.create_refresh_button(model, update_lora_models, lambda: {"choices": list(lora_models.keys())}, "refresh_lora_models")
+
+        with gr.Row():
+            with gr.Column():
+              gr.HTML(value="Get comma-separated list of models (for XY Grid)")
+              model_dir = gr.Textbox("", label=f"Model directory", placeholder="Optional, uses selected model's directory if blank")
+              model_sort_by = gr.Radio(label="Sort models by", choices=["name", "date", "path name"], value="name", type="value")
+              get_list_button = gr.Button("Get List")
+            with gr.Column():
+              model_list = gr.Textbox(value="", label="Model list", placeholder="Model list will be output here")
+
       with gr.Column():
-        metadata_view = gr.JSON(value="test")
+        metadata_view = gr.JSON(value="test", label="Network metadata")
 
     def update_metadata(module, model):
       if model == "None":
@@ -286,7 +294,7 @@ def on_ui_tabs():
       if model_path is None:
         return f"file not found: {model_path}"
 
-      metadata = read_lora_metadata(model, module)
+      metadata = read_lora_metadata(model_path, module)
 
       if metadata is None:
         return "No metadata found."
@@ -294,6 +302,22 @@ def on_ui_tabs():
         return metadata
 
     model.change(update_metadata, inputs=[module, model], outputs=[metadata_view])
+
+    def output_model_list(module, model, model_dir, sort_by):
+        if model_dir == "":
+            # Get list of models with same folder as this one
+            model_path = lora_models.get(model, None)
+            if model_path is None:
+                return f"file not found: {model_path}"
+            model_dir = os.path.dirname(model_path)
+
+        if not os.path.isdir(model_dir):
+            return f"directory not found: {model_dir}"
+
+        found = get_all_models(sort_by, "", model_dir)
+        return ", ".join(found.keys())
+
+    get_list_button.click(output_model_list, inputs=[module, model, model_dir, model_sort_by], outputs=[model_list])
 
   return [(additional_networks_interface, "Additional Networks", "additional_networks")]
 
@@ -375,18 +399,11 @@ def format_lora_model(p, opt, x):
     model_path = lora_models.get(model)
     metadata = read_lora_metadata(model_path, "LoRA")
     if not metadata:
-        print("nometa")
         return value
-    import pprint
-    pprint.pp(metadata)
 
     metadata_names = shared.opts.data.get("additional_networks_xy_grid_model_metadata", "").split(",")
     if not metadata_names:
-        print("nonames")
         return value
-
-    import pprint
-    pprint.pp(metadata_names)
 
     for name in metadata_names:
         name = name.strip()
