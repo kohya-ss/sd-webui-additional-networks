@@ -45,7 +45,7 @@ update_lora_models()
 class Script(scripts.Script):
   def __init__(self) -> None:
     super().__init__()
-    self.latest_params = [(None, None, None)] * MAX_MODEL_COUNT
+    self.latest_params = [(None, None, None, None)] * MAX_MODEL_COUNT
     self.latest_networks = []
     self.latest_model_hash = ""
 
@@ -72,14 +72,17 @@ class Script(scripts.Script):
                                           label=f"Model {i+1}",
                                           value="None")
 
-            weight = gr.Slider(label=f"Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=.05)
-          ctrls.extend((module, model, weight))
+            weight_unet = gr.Slider(label=f"Unet Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=.05)
+            weight_tenc = gr.Slider(label=f"Tenc Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=.05)
+
+          ctrls.extend((module, model, weight_unet, weight_tenc))
           model_dropdowns.append(model)
 
           self.infotext_fields.extend([
               (module, f"AddNet Module {i+1}"),
               (model, f"AddNet Model {i+1}"),
-              (weight, f"AddNet Weight {i+1}"),
+              (weight_unet, f"AddNet Unet Weight {i+1}"),
+              (weight_tenc, f"AddNet Tenc Weight {i+1}"),
           ])
 
         def refresh_all_models(*dropdowns):
@@ -102,14 +105,15 @@ class Script(scripts.Script):
 
   def set_infotext_fields(self, p, params):
     for i, t in enumerate(params):
-      module, model, weight = t
-      if model is None or model == "None" or len(model) == 0 or weight == 0:
+      module, model, weight_unet, weight_tenc = t
+      if model is None or model == "None" or len(model) == 0 or (weight_unet == 0 and weight_tenc == 0):
         continue
       p.extra_generation_params.update({
         "AddNet Enabled": True,
         f"AddNet Module {i+1}": module,
         f"AddNet Model {i+1}": model,
-        f"AddNet Weight {i+1}": weight,
+        f"AddNet Unet Weight {i+1}": weight_unet,
+        f"AddNet Tenc Weight {i+1}": weight_tenc,
        })
 
   def process(self, p, *args):
@@ -129,18 +133,18 @@ class Script(scripts.Script):
 
     params = []
     for i, ctrl in enumerate(args[1:]):
-      if i % 3 == 0:
+      if i % 4 == 0:
         param = [ctrl]
       else:
         param.append(ctrl)
-        if i % 3 == 2:
+        if i % 4 == 2:
           params.append(param)
 
     models_changed = (len(self.latest_networks) == 0)                   # no latest network (cleared by check-off)
     models_changed = models_changed or self.latest_model_hash != p.sd_model.sd_model_hash
     if not models_changed:
-      for (l_module, l_model, l_weight), (module, model, weight) in zip(self.latest_params, params):
-        if l_module != module or l_model != model or l_weight != weight:
+      for (l_module, l_model, l_weight_unet, l_weight_tenc), (module, model, weight_unet, weight_tenc) in zip(self.latest_params, params):
+        if l_module != module or l_model != model or l_weight_unet != weight_unet or l_weight_tenc != weight_tenc:
           models_changed = True
           break
 
@@ -149,11 +153,11 @@ class Script(scripts.Script):
       self.latest_params = params
       self.latest_model_hash = p.sd_model.sd_model_hash
 
-      for module, model, weight in self.latest_params:
+      for module, model, weight_unet, weight_tenc in self.latest_params:
         if model is None or model == "None" or len(model) == 0:
           continue
-        if weight == 0:
-          print(f"ignore because weight is 0: {model}")
+        if weight_unet == 0 and weight_tenc == 0:
+          print(f"ignore because weights are 0: {model}")
           continue
 
         model_path = lora_models.get(model, None)
@@ -166,7 +170,7 @@ class Script(scripts.Script):
           print(f"file not found: {model_path}")
           continue
 
-        print(f"{module} weight: {weight}, model: {model}")
+        print(f"{module} weight_unet: {weight_unet}, weight_tenc: {weight_tenc}, model: {model}")
         if module == "LoRA":
           if os.path.splitext(model_path)[1] == '.safetensors':
             from safetensors.torch import load_file
@@ -174,7 +178,7 @@ class Script(scripts.Script):
           else:
             du_state_dict = torch.load(model_path, map_location='cpu')
 
-          network, info = lora_compvis.create_network_and_apply_compvis(du_state_dict, weight, text_encoder, unet)
+          network, info = lora_compvis.create_network_and_apply_compvis(du_state_dict, weight_unet, weight_tenc, text_encoder, unet)
           network.to(p.sd_model.device, dtype=p.sd_model.dtype)         # in medvram, device is different for u-net and sd_model, so use sd_model's
 
           print(f"LoRA model {model} loaded: {info}")

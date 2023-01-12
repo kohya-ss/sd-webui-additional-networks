@@ -59,7 +59,7 @@ class LoRAModule(torch.nn.Module):
     return self.org_forward(x) + self.lora_up(self.lora_down(x)) * self.multiplier
 
 
-def create_network_and_apply_compvis(du_state_dict, multiplier, text_encoder, unet, **kwargs):
+def create_network_and_apply_compvis(du_state_dict, multiplier_unet, multiplier_tenc, text_encoder, unet, **kwargs):
   # get device and dtype from unet
   for module in unet.modules():
     if module.__class__.__name__ == "Linear":
@@ -71,10 +71,10 @@ def create_network_and_apply_compvis(du_state_dict, multiplier, text_encoder, un
   # get dims from state dict
   size = du_state_dict[list(du_state_dict.keys())[0]].size()          # if conv2d size is like [320,4,1,1]
   network_dim = min([s for s in size if s > 1])
-  print(f"dimension: {network_dim}, multiplier: {multiplier}")
+  print(f"dimension: {network_dim}, multiplier_unet: {multiplier_unet}, multiplier_tenc: {multiplier_tenc}")
 
   # create, apply and load weights
-  network = LoRANetworkCompvis(text_encoder, unet, multiplier=multiplier, lora_dim=network_dim)
+  network = LoRANetworkCompvis(text_encoder, unet, multiplier_unet=multiplier_unet, multiplier_tenc = multiplier_tenc, lora_dim=network_dim)
   state_dict = network.apply_lora_modules(du_state_dict)              # some weights are applied to text encoder
   network.to(dtype)                                              # with this, if error comes from next line, the model will be used
   info = network.load_state_dict(state_dict, strict=False)
@@ -156,15 +156,16 @@ class LoRANetworkCompvis(torch.nn.Module):
 
     return new_sd
 
-  def __init__(self, text_encoder, unet, multiplier=1.0, lora_dim=4) -> None:
+  def __init__(self, text_encoder, unet, multiplier_unet=1.0, multiplier_tenc=1.0, lora_dim=4) -> None:
     super().__init__()
-    self.multiplier = multiplier
+    self.multiplier_unet = multiplier_unet
+    self.multiplier_tenc = multiplier_tenc
     self.lora_dim = lora_dim
 
     # create module instances
     self.v2 = False
 
-    def create_modules(prefix, root_module: torch.nn.Module, target_replace_modules) -> list:
+    def create_modules(prefix, root_module: torch.nn.Module, target_replace_modules, multiplier=1.0) -> list:
       loras = []
       replaced_modules = []
       for name, module in root_module.named_modules():
@@ -175,7 +176,7 @@ class LoRANetworkCompvis(torch.nn.Module):
               lora_name = lora_name.replace('.', '_')
               if '_resblocks_23_' in lora_name:                           # ignore last block in StabilityAi Text Encoder
                 break
-              lora = LoRAModule(lora_name, child_module, self.multiplier, self.lora_dim)
+              lora = LoRAModule(lora_name, child_module, multiplier, self.lora_dim)
               loras.append(lora)
 
               replaced_modules.append(child_module)
@@ -188,18 +189,18 @@ class LoRANetworkCompvis(torch.nn.Module):
                 if '_resblocks_23_' in module_name:                           # ignore last block in StabilityAi Text Encoder
                   break
                 lora_name = module_name + '_' + suffix
-                lora_info = LoRAInfo(lora_name, module_name, child_module, self.multiplier, self.lora_dim)
+                lora_info = LoRAInfo(lora_name, module_name, child_module, multiplier, self.lora_dim)
                 loras.append(lora_info)
 
                 replaced_modules.append(child_module)
       return loras, replaced_modules
 
     self.text_encoder_loras, te_rep_modules = create_modules(LoRANetworkCompvis.LORA_PREFIX_TEXT_ENCODER,
-                                                             text_encoder, LoRANetworkCompvis.TEXT_ENCODER_TARGET_REPLACE_MODULE)
+                                                             text_encoder, LoRANetworkCompvis.TEXT_ENCODER_TARGET_REPLACE_MODULE, multiplier_tenc)
     print(f"create LoRA for Text Encoder: {len(self.text_encoder_loras)} modules.")
 
     self.unet_loras, unet_rep_modules = create_modules(
-        LoRANetworkCompvis.LORA_PREFIX_UNET, unet, LoRANetworkCompvis.UNET_TARGET_REPLACE_MODULE)
+        LoRANetworkCompvis.LORA_PREFIX_UNET, unet, LoRANetworkCompvis.UNET_TARGET_REPLACE_MODULE, multiplier_unet)
     print(f"create LoRA for U-Net: {len(self.unet_loras)} modules.")
 
     # make backup of original forward/weights, if multiple modules are applied, do in 1st module onnly
