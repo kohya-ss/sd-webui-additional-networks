@@ -65,6 +65,8 @@ def get_all_models(sort_by, filter_by, path):
 def find_closest_lora_model_name(search: str):
     if not search:
         return None
+    if search in lora_models:
+        return search
     search = search.lower()
     if search in lora_model_names:
         return lora_model_names.get(search)
@@ -391,7 +393,7 @@ LORA_METADATA_NAMES = {
 
 def format_lora_model(p, opt, x):
     model = find_closest_lora_model_name(x)
-    if model is None:
+    if model is None or model.lower() in ["", "none"]:
         return "None"
 
     value = xy_grid.format_value(p, opt, model)
