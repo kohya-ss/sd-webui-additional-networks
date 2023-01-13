@@ -26,37 +26,37 @@ os.makedirs(lora_models_dir, exist_ok=True)
 
 
 def traverse_all_files(curr_path, model_list):
-    f_list = [(os.path.join(curr_path, entry.name), entry.stat()) for entry in os.scandir(curr_path)]
-    for f_info in f_list:
-        fname, fstat = f_info
-        if os.path.splitext(fname)[1] in LORA_MODEL_EXTS:
-            model_list.append(f_info)
-        elif stat.S_ISDIR(fstat.st_mode):
-            model_list = traverse_all_files(fname, model_list)
-    return model_list
+  f_list = [(os.path.join(curr_path, entry.name), entry.stat()) for entry in os.scandir(curr_path)]
+  for f_info in f_list:
+    fname, fstat = f_info
+    if os.path.splitext(fname)[1] in LORA_MODEL_EXTS:
+      model_list.append(f_info)
+    elif stat.S_ISDIR(fstat.st_mode):
+      model_list = traverse_all_files(fname, model_list)
+  return model_list
 
 
 def get_all_models(sort_by, filter_by, path):
-    res = OrderedDict()
-    fileinfos = traverse_all_files(path, [])
-    filter_by = filter_by.strip(" ")
-    if len(filter_by) != 0:
-        fileinfos = [x for x in fileinfos if filter_by.lower() in os.path.basename(x[0]).lower()]
-    if sort_by == "name":
-        fileinfos = sorted(fileinfos, key=lambda x: os.path.basename(x[0]))
-    elif sort_by == "date":
-        fileinfos = sorted(fileinfos, key=lambda x: -x[1].st_mtime)
-    elif sort_by == "path name":
-        fileinfos = sorted(fileinfos)
+  res = OrderedDict()
+  fileinfos = traverse_all_files(path, [])
+  filter_by = filter_by.strip(" ")
+  if len(filter_by) != 0:
+    fileinfos = [x for x in fileinfos if filter_by.lower() in os.path.basename(x[0]).lower()]
+  if sort_by == "name":
+    fileinfos = sorted(fileinfos, key=lambda x: os.path.basename(x[0]))
+  elif sort_by == "date":
+    fileinfos = sorted(fileinfos, key=lambda x: -x[1].st_mtime)
+  elif sort_by == "path name":
+    fileinfos = sorted(fileinfos)
 
-    for finfo in fileinfos:
-        filename = finfo[0]
-        name = os.path.splitext(os.path.basename(filename))[0]
-        # Prevent a hypothetical "None.pt" from being listed.
-        if name != "None":
-            res[name + f"({sd_models.model_hash(filename)})"] = filename
+  for finfo in fileinfos:
+    filename = finfo[0]
+    name = os.path.splitext(os.path.basename(filename))[0]
+    # Prevent a hypothetical "None.pt" from being listed.
+    if name != "None":
+      res[name + f"({sd_models.model_hash(filename)})"] = filename
 
-    return res
+  return res
 
 
 def update_lora_models():
@@ -104,8 +104,8 @@ class Script(scripts.Script):
           with gr.Row():
             module = gr.Dropdown(["LoRA"], label=f"Network module {i+1}", value="LoRA")
             model = gr.Dropdown(list(lora_models.keys()),
-                                          label=f"Model {i+1}",
-                                          value="None")
+                                label=f"Model {i+1}",
+                                value="None")
 
             weight = gr.Slider(label=f"Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=.05)
           ctrls.extend((module, model, weight))
@@ -141,11 +141,11 @@ class Script(scripts.Script):
       if model is None or model == "None" or len(model) == 0 or weight == 0:
         continue
       p.extra_generation_params.update({
-        "AddNet Enabled": True,
-        f"AddNet Module {i+1}": module,
-        f"AddNet Model {i+1}": model,
-        f"AddNet Weight {i+1}": weight,
-       })
+          "AddNet Enabled": True,
+          f"AddNet Module {i+1}": module,
+          f"AddNet Model {i+1}": model,
+          f"AddNet Weight {i+1}": weight,
+      })
 
   def process(self, p, *args):
     unet = p.sd_model.model.diffusion_model
@@ -249,13 +249,8 @@ def on_ui_tabs():
       if module == "LoRA":
         if os.path.splitext(model_path)[1] == '.safetensors':
           from safetensors.torch import safe_open
-          with safe_open(model_path, framework="pt") as f:
+          with safe_open(model_path, framework="pt") as f:                      # default device is 'cpu'
             metadata = f.metadata()
-        else:
-          with zipfile.ZipFile(model_path, "r") as zipf:
-            if "sd_scripts_metadata.json" in zipf.namelist():
-              with zipf.open("sd_scripts_metadata.json", "r") as jsfile:
-                metadata = json.load(jsfile)
 
       if metadata is None:
         return "No metadata found."
@@ -268,10 +263,10 @@ def on_ui_tabs():
 
 
 def on_ui_settings():
-    section = ('additional_networks', "Additional Networks")
-    shared.opts.add_option("additional_networks_extra_lora_path", shared.OptionInfo("", "Extra path to scan for LoRA models (e.g. training output directory)", section=section))
-    shared.opts.add_option("additional_networks_sort_models_by", shared.OptionInfo("name", "Sort LoRA models by", gr.Radio, {"choices": ["name", "date", "path name"]}, section=section))
-    shared.opts.add_option("additional_networks_model_name_filter", shared.OptionInfo("", "LoRA model name filter", section=section))
+  section = ('additional_networks', "Additional Networks")
+  shared.opts.add_option("additional_networks_extra_lora_path", shared.OptionInfo("", "Extra path to scan for LoRA models (e.g. training output directory)", section=section))
+  shared.opts.add_option("additional_networks_sort_models_by", shared.OptionInfo("name", "Sort LoRA models by", gr.Radio, {"choices": ["name", "date", "path name"]}, section=section))
+  shared.opts.add_option("additional_networks_model_name_filter", shared.OptionInfo("", "LoRA model name filter", section=section))
 
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
