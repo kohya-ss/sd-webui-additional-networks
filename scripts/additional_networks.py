@@ -433,5 +433,16 @@ def on_ui_settings():
     shared.opts.add_option("additional_networks_xy_grid_model_metadata", shared.OptionInfo("", "Metadata to show in XY-Grid label for Model axes, comma-separated (example: \"ss_learning_rate, ss_num_epochs\")", section=section))
 
 
+def on_infotext_pasted(infotext, params):
+    for i in range(MAX_MODEL_COUNT):
+        if f"AddNet Module {i+1}" not in params:
+            params[f"AddNet Module {i+1}"] = "LoRA"
+        if f"AddNet Model {i+1}" not in params:
+            params[f"AddNet Model {i+1}"] = "None"
+        if f"AddNet Weight {i+1}" not in params:
+            params[f"AddNet Weight {i+1}"] = "0"
+
+
 script_callbacks.on_ui_tabs(on_ui_tabs)
 script_callbacks.on_ui_settings(on_ui_settings)
+script_callbacks.on_infotext_pasted(on_infotext_pasted)
