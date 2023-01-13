@@ -4,6 +4,9 @@
 
 ## Updates / 更新情報
 
+- Jan 13 2023, 2023/1/13:
+  - The metadata for the model can be inspected from ``Additional Networks`` tab.
+  - モデルのメタデータが  ``Additional Networks`` から確認できるようになりました。
 - Jan 9 2023
   - The method of selecting a model has changed.
   - __Place models files in the folder  ``extensions\sd-webui-additional-networks\models\lora``__
@@ -19,13 +22,6 @@
       - スキャンするフォルダを追加できます。 ``Settings`` タブの ``Additional Networks`` （左下にあります）を選択し、 ``Extra path to scan for LoRA models:`` で設定してください。
     - 生成された PNG の infotext に設定が保存されるようになりました。  ``PNG Info`` タブから ``txt2img`` ボタンで復元されます。
     - 素晴らしいプルリクをいただいた space-nuko 氏に感謝します。
-
-- Jan 8 2023, 2023/1/8: 
-  - Supports medvram/lowvram in web UI. Thanks for ddvarpdd!
-  - Web UI に medvram/lowvram オプションを付けた場合でも動作するよう修正しました。ddvarpdd 氏に感謝します。
-- Jan 6 2023, 2023/1/6: 
-  - Fixed a bug that broke the model were broken when switching enable->disable->enable...
-  - SD 2.x のモデルで有効・無効を繰り返し切り替えるとモデルが壊れていく不具合を修正しました。
 
 ## About
 
