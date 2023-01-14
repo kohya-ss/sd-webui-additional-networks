@@ -7,8 +7,10 @@
 - Jan 14 2023, 2023/1/14:
   - [X/Y plot is supported](#xy-plot). Thanks to space-nuko for this great contribution! 
   - The metadata for the model can be inspected from ``Additional Networks`` tab.
+  - Please update the web UI to the latest version to work the extension.
   - [X/Y plotに対応しました](#xy-plot-1)。素晴らしいプルリクをいただいた space-nuko 氏に改めて感謝します。
   - モデルのメタデータが  ``Additional Networks`` から確認できるようになりました。
+  - 拡張が正しく動作しない場合、Web UI を最新版に更新してください。
 
 ## About
 
