@@ -258,11 +258,6 @@ def read_lora_metadata(model_path, module):
       from safetensors.torch import safe_open
       with safe_open(model_path, framework="pt") as f:
         metadata = f.metadata()
-    else:
-      with zipfile.ZipFile(model_path, "r") as zipf:
-        if "sd_scripts_metadata.json" in zipf.namelist():
-          with zipf.open("sd_scripts_metadata.json", "r") as jsfile:
-            metadata = json.load(jsfile)
 
   return metadata
 
@@ -374,6 +369,7 @@ LORA_METADATA_NAMES = {
     "ss_lr_scheduler": "LR scheduler",
     "ss_network_module": "Network module",
     "ss_network_dim": "Network dim",
+    "ss_mixed_precision": "Mixed precision", 
     "ss_full_fp16": "Full FP16",
     "ss_v2": "V2",
     "ss_resolution": "Resolution",
@@ -387,7 +383,9 @@ LORA_METADATA_NAMES = {
     "ss_enable_bucket": "Enable bucket",
     "ss_min_bucket_reso": "Min bucket reso.",
     "ss_max_bucket_reso": "Max bucket reso.",
-    "ss_seed": "Seed"
+    "ss_seed": "Seed", 
+    "ss_sd_model_name": "SD model name",
+    "ss_vae_name": "VAE name"
 }
 
 
