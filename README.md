@@ -4,24 +4,11 @@
 
 ## Updates / 更新情報
 
-- Jan 13 2023, 2023/1/13:
+- Jan 14 2023, 2023/1/14:
+  - X/Y plot is supporeted. Thanks to space-nuko for this great contribution! 
   - The metadata for the model can be inspected from ``Additional Networks`` tab.
   - モデルのメタデータが  ``Additional Networks`` から確認できるようになりました。
-- Jan 9 2023
-  - The method of selecting a model has changed.
-  - __Place models files in the folder  ``extensions\sd-webui-additional-networks\models\lora``__
-    - All models, including in subfolders, are listed in the drop-down.
-    - You can add an extra folder at ``Settings`` tab -> ``Additional Networks`` on left bottom -> ``Extra path to scan for LoRA models:``
-  - Generated PNGs now have settings about LoRA in the infotext, which can be restored by sending it from ``PNG Info`` tab by ``txt2img`` button.
-  - Thanks to space-nuko for this great contribution!
-
- - 2023/1/9:
-    - モデル選択方法が変わりました。
-    - __モデルファイルを Web UI の``extensions\sd-webui-additional-networks\models\lora`` フォルダに置いてください。__
-      - サブフォルダにあるものも含めすべてのモデルがドロップダウンに表示されます。
-      - スキャンするフォルダを追加できます。 ``Settings`` タブの ``Additional Networks`` （左下にあります）を選択し、 ``Extra path to scan for LoRA models:`` で設定してください。
-    - 生成された PNG の infotext に設定が保存されるようになりました。  ``PNG Info`` タブから ``txt2img`` ボタンで復元されます。
-    - 素晴らしいプルリクをいただいた space-nuko 氏に感謝します。
+  - X/Y plotに対応しました。素晴らしいプルリクをいただいた space-nuko 氏に改めて感謝します。
 
 ## About
 
@@ -59,6 +46,20 @@ Repeat them for the module/model/weight 2 to 5 if you have other models. Models 
 
 You can generate images with the model with these additional networks.
 
+## X/Y plot
+
+If you use LoRA models to plot, put the comma separated list of the model names into ``AddNet Model X`` 
+
+![image](https://user-images.githubusercontent.com/52813779/212444037-8ccd9157-c341-4eb4-82b4-64e3c8ee0237.png)
+
+You can get the list in ``Additional Networks`` tab on top of the UI. Select some model from ``Model`` dropdown, and push ``Get List`` button. The model list can be copied for X/Y values.
+
+![image](https://user-images.githubusercontent.com/52813779/212443639-97779d8d-0f7e-47f0-919c-41f053fe28a9.png)
+
+The metadata of the model can be drawn as legends. Move to ``Settings`` tab, select ``Additional Networks`` at left bottom, and set ``Metadata to show``. Available values are in ``Network metadata`` textbox in ``Additional Networks`` tab.
+
+![image](https://user-images.githubusercontent.com/52813779/212443781-1f4c442e-c2f3-47f8-b698-25fbe981f633.png)
+
 ## この Web UI 拡張について
 
 LoRA などのネットワークを元の Stable Diffusion に追加し、画像生成を行うための拡張です。現在は LoRA のみ対応しています。
@@ -94,3 +95,18 @@ __"Weight"__ にこのモデルの __重み__ を指定します（負の値も�
 追加のモデルがある場合は 2～5 に指定してください。モデルは 1~5 の順番で適用されます。
 
 以上を指定すると、それぞれのモデルが適用された状態で画像生成されます。
+
+## X/Y plot
+
+LoRAモデルをX/Y plotの値（選択対象）として使う場合は、カンマ区切りのモデルのリストを与える必要があります。
+
+![image](https://user-images.githubusercontent.com/52813779/212444037-8ccd9157-c341-4eb4-82b4-64e3c8ee0237.png)
+
+モデルのリストはWeb UI上部の ``Additional Networks`` タブで取得できます。タブを開き、 ``Model`` ドロップダウンから適当なモデルを選択し、``Get List`` ボタンを押してください。モデルのリストが表示されます。リストはコピーしてX/Y plotのvaluesに指定できます。
+
+![image](https://user-images.githubusercontent.com/52813779/212443639-97779d8d-0f7e-47f0-919c-41f053fe28a9.png)
+
+モデルのメタデータ（学習時のパラメータなど）をX/Y plotのラベルに使用できます。Web UI上部の ``Settings`` タブを開き、左下から ``Additional Networks`` を選び、 ``Metadata to show`` にカンマ区切りで項目名を指定してください（``ss_learning_rate, ss_num_epochs`` のような感じになります）。使える値は ``Additional Networks`` の ``Network metadata`` 欄にある値です。
+
+![image](https://user-images.githubusercontent.com/52813779/212443781-1f4c442e-c2f3-47f8-b698-25fbe981f633.png)
+
