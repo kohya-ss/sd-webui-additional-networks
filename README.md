@@ -5,10 +5,10 @@
 ## Updates / 更新情報
 
 - Jan 14 2023, 2023/1/14:
-  - X/Y plot is supporeted. Thanks to space-nuko for this great contribution! 
+  - [X/Y plot is supported](#xy-plot). Thanks to space-nuko for this great contribution! 
   - The metadata for the model can be inspected from ``Additional Networks`` tab.
+  - [X/Y plotに対応しました](#xy-plot-1)。素晴らしいプルリクをいただいた space-nuko 氏に改めて感謝します。
   - モデルのメタデータが  ``Additional Networks`` から確認できるようになりました。
-  - X/Y plotに対応しました。素晴らしいプルリクをいただいた space-nuko 氏に改めて感謝します。
 
 ## About
 
