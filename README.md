@@ -4,6 +4,9 @@
 
 ## Updates / 更新情報
 
+- Jan 15 2023, 2023/1/15:
+  - Fix that other extensions and X/Y plot are sometimes shown/run twice.
+  - 他の拡張やX/Y plotが重複して表示・実行される不具合を修正しました。
 - Jan 14 2023, 2023/1/14:
   - [X/Y plot is supported](#xy-plot). Thanks to space-nuko for this great contribution! 
   - The metadata for the model can be inspected from ``Additional Networks`` tab.
