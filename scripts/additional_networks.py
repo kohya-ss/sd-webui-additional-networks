@@ -414,9 +414,9 @@ def format_lora_model(p, opt, x):
     return value.strip(" ").strip(",")
 
 
-for script_class, path, basedir, script_module in scripts.scripts_data:
-    if os.path.basename(path) == "xy_grid.py":
-        xy_grid = script_module
+for scriptDataTuple in scripts.scripts_data:
+    if os.path.basename(scriptDataTuple.path) == "xy_grid.py":
+        xy_grid = scriptDataTuple.module
         for i in range(MAX_MODEL_COUNT):
            model = xy_grid.AxisOption(f"AddNet Model {i+1}", str, lambda p, x, xs, i=i: apply_model(p, x, xs, i), format_lora_model, confirm_models)
            weight = xy_grid.AxisOption(f"AddNet Weight {i+1}", float, lambda p, x, xs, i=i: apply_weight(p, x, xs, i), xy_grid.format_value_add_label, None)
