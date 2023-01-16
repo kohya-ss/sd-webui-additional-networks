@@ -5,18 +5,10 @@
 ## Updates / 更新情報
 
 - Jan 16 2023, 2023/1/16:
-  - Fix the issue about the directory name for models.
-  - Linuxでのモデル保存先ディレクトリの互換性問題を修正しました。
-- Jan 15 2023, 2023/1/15:
-  - Fix that other extensions and X/Y plot are sometimes shown/run twice.
-  - 他の拡張やX/Y plotが重複して表示・実行される不具合を修正しました。
-- Jan 14 2023, 2023/1/14:
-  - [X/Y plot is supported](#xy-plot). Thanks to space-nuko for this great contribution! 
-  - The metadata for the model can be inspected from ``Additional Networks`` tab.
-  - Please update the web UI to the latest version to work the extension.
-  - [X/Y plotに対応しました](#xy-plot-1)。素晴らしいプルリクをいただいた space-nuko 氏に改めて感謝します。
-  - モデルのメタデータが  ``Additional Networks`` から確認できるようになりました。
-  - 拡張が正しく動作しない場合、Web UI を最新版に更新してください。
+  - Update to support X/Y plot in the latest web UI. 
+  - If you cannot update the web UI, please download .zip file of the older version of this extension, from ``Releases``, and extract it to ``extensions`` folder.
+  - 最新版の Web UI のX/Y plotで動作するよう更新しました。
+  - Web UI を最新版に更新できない場合は、``Releases`` のところから過去のバージョンの zip ファイルをダウンロードし、``extensions`` フォルダへ展開してください。
 
 ## About
 
