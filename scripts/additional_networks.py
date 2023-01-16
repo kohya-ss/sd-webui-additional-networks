@@ -418,8 +418,8 @@ for scriptDataTuple in scripts.scripts_data:
     if os.path.basename(scriptDataTuple.path) == "xy_grid.py":
         xy_grid = scriptDataTuple.module
         for i in range(MAX_MODEL_COUNT):
-           model = xy_grid.AxisOption(f"AddNet Model {i+1}", str, lambda p, x, xs, i=i: apply_model(p, x, xs, i), format_lora_model, confirm_models)
-           weight = xy_grid.AxisOption(f"AddNet Weight {i+1}", float, lambda p, x, xs, i=i: apply_weight(p, x, xs, i), xy_grid.format_value_add_label, None)
+           model = xy_grid.AxisOption(f"AddNet Model {i+1}", str, lambda p, x, xs, i=i: apply_model(p, x, xs, i), format_lora_model, confirm_models, 0.5)
+           weight = xy_grid.AxisOption(f"AddNet Weight {i+1}", float, lambda p, x, xs, i=i: apply_weight(p, x, xs, i), xy_grid.format_value_add_label, None, 0)
            xy_grid.axis_options.extend([model, weight])
 
 
