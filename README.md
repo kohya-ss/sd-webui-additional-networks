@@ -4,6 +4,9 @@
 
 ## Updates / 更新情報
 
+- Jan 16 2023, 2023/1/16:
+  - Fix the issue about the directory name for models.
+  - Linuxでのモデル保存先ディレクトリの互換性問題を修正しました。
 - Jan 15 2023, 2023/1/15:
   - Fix that other extensions and X/Y plot are sometimes shown/run twice.
   - 他の拡張やX/Y plotが重複して表示・実行される不具合を修正しました。
