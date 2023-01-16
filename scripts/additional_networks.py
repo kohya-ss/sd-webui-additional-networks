@@ -24,7 +24,7 @@ MAX_MODEL_COUNT = 5
 LORA_MODEL_EXTS = [".pt", ".ckpt", ".safetensors"]
 lora_models = {}      # "My_Lora(abcd1234)" -> C:/path/to/model.safetensors
 lora_model_names = {} # "my_lora" -> "My_Lora(abcd1234)"
-lora_models_dir = os.path.join(scripts.basedir(), "models/LoRA")
+lora_models_dir = os.path.join(scripts.basedir(), "models/lora")
 os.makedirs(lora_models_dir, exist_ok=True)
 
 
