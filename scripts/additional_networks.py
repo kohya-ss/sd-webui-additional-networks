@@ -20,6 +20,44 @@ import modules.ui
 from scripts import lora_compvis
 
 
+# Metadata pertaining to LoRA training
+LORA_TRAIN_METADATA_NAMES = {
+    "ss_learning_rate": "Learning rate",
+    "ss_text_encoder_lr": "Text encoder LR",
+    "ss_unet_lr": "UNet LR",
+    "ss_num_train_images": "# of training images",
+    "ss_num_reg_images": "# of reg images",
+    "ss_num_batches_per_epoch": "Batches per epoch",
+    "ss_num_epochs": "Total epochs",
+    "ss_epoch": "Epoch",
+    "ss_batch_size_per_device": "Batch size/device",
+    "ss_total_batch_size": "Total batch size",
+    "ss_gradient_accumulation_steps": "Gradient accum. steps",
+    "ss_max_train_steps": "Max train steps",
+    "ss_lr_warmup_steps": "LR warmup steps",
+    "ss_lr_scheduler": "LR scheduler",
+    "ss_network_module": "Network module",
+    "ss_network_dim": "Network dim",
+    "ss_mixed_precision": "Mixed precision",
+    "ss_full_fp16": "Full FP16",
+    "ss_v2": "V2",
+    "ss_resolution": "Resolution",
+    "ss_clip_skip": "Clip skip",
+    "ss_max_token_length": "Max token length",
+    "ss_color_aug": "Color aug",
+    "ss_flip_aug": "Flip aug",
+    "ss_random_crop": "Random crop",
+    "ss_shuffle_caption": "Shuffle caption",
+    "ss_cache_latents": "Cache latents",
+    "ss_enable_bucket": "Enable bucket",
+    "ss_min_bucket_reso": "Min bucket reso.",
+    "ss_max_bucket_reso": "Max bucket reso.",
+    "ss_seed": "Seed",
+    "ss_sd_model_name": "SD model name",
+    "ss_vae_name": "VAE name"
+}
+
+
 MAX_MODEL_COUNT = 5
 LORA_MODEL_EXTS = [".pt", ".ckpt", ".safetensors"]
 lora_models = {}      # "My_Lora(abcd1234)" -> C:/path/to/model.safetensors
@@ -262,6 +300,28 @@ def read_lora_metadata(model_path, module):
   return metadata
 
 
+def write_lora_metadata(model_path, module, updates):
+  if model_path.startswith("\"") and model_path.endswith("\""):             # trim '"' at start/end
+    model_path = model_path[1:-1]
+  if not os.path.exists(model_path):
+    return None
+
+  from safetensors.torch import safe_open, save_file
+  metadata = None
+  tensors = {}
+  if module == "LoRA":
+    if os.path.splitext(model_path)[1] == '.safetensors':
+      with safe_open(model_path, framework="pt") as f:
+        metadata = f.metadata()
+        for k in f.keys():
+          tensors[k] = f.get_tensor(k)
+
+      for k, v in updates.items():
+        metadata[k] = str(v)
+
+      save_file(tensors, model_path, metadata)
+
+
 def on_ui_tabs():
   with gr.Blocks(analytics_enabled=False) as additional_networks_interface:
     with gr.Row().style(equal_height=False):
@@ -272,18 +332,34 @@ def on_ui_tabs():
           modules.ui.create_refresh_button(model, update_lora_models, lambda: {"choices": list(lora_models.keys())}, "refresh_lora_models")
 
         with gr.Row():
-            with gr.Column():
-              gr.HTML(value="Get comma-separated list of models (for XY Grid)")
-              model_dir = gr.Textbox("", label=f"Model directory", placeholder="Optional, uses selected model's directory if blank")
-              model_sort_by = gr.Radio(label="Sort models by", choices=["name", "date", "path name"], value="name", type="value")
-              get_list_button = gr.Button("Get List")
-            with gr.Column():
-              model_list = gr.Textbox(value="", label="Model list", placeholder="Model list will be output here")
+          with gr.Column():
+            gr.HTML(value="Get comma-separated list of models (for XY Grid)")
+            model_dir = gr.Textbox("", label=f"Model directory", placeholder="Optional, uses selected model's directory if blank")
+            model_sort_by = gr.Radio(label="Sort models by", choices=["name", "date", "path name"], value="name", type="value")
+            get_list_button = gr.Button("Get List")
+          with gr.Column():
+            model_list = gr.Textbox(value="", label="Model list", placeholder="Model list will be output here")
 
       with gr.Column():
-        metadata_view = gr.JSON(value="{}", label="Network metadata")
+        with gr.Row():
+          display_name = gr.Textbox(value="", label="Name", placeholder="Display name for this model")
+        with gr.Row():
+          keywords = gr.Textbox(value="", label="Keywords", placeholder="Activation keywords, comma-separated")
+        with gr.Row():
+          description = gr.Textbox(value="", label="Description", placeholder="Model description/readme/notes/instructions", lines=15)
+        with gr.Row():
+          rating = gr.Slider(minimum=0, maximum=10, step=1, label="Rating", value=0)
+          tags = gr.Textbox(value="", label="Tags", placeholder="Comma-separated list of tags (\"artist, style, landscape, 2d, 3d...\")", lines=2)
+        with gr.Row():
+          save_metadata_button = gr.Button("Save Metadata", variant="primary")
+          save_output = gr.HTML("")
+      with gr.Column():
+        with gr.Row():
+          cover_image = gr.Image(label="Cover image", elem_id="additional_networks_cover_image", source="upload", interactive=True, type="pil", image_mode="RGBA").style(height=480)
+        with gr.Row():
+          metadata_view = gr.JSON(value="{}", label="Training parameters")
 
-    def update_metadata(module, model):
+    def refresh_metadata(module, model):
       if model == "None":
         return {}
 
@@ -294,11 +370,46 @@ def on_ui_tabs():
       metadata = read_lora_metadata(model_path, module)
 
       if metadata is None:
-        return '{"info":"No metadata found."}'
+        training_params = "No training parameters found."
+        metadata = {}
       else:
-        return metadata
+        training_params = {k: v for k, v in metadata.items() if k in LORA_TRAIN_METADATA_NAMES}
+        if not training_params:
+          training_params = "No training parameters found."
 
-    model.change(update_metadata, inputs=[module, model], outputs=[metadata_view])
+      cover_image = metadata.get("ss_md_cover_image", None)
+      if cover_image == "None":
+        cover_image = None
+      display_name = metadata.get("ss_md_display_name", "")
+      keywords = metadata.get("ss_md_keywords", "")
+      description = metadata.get("ss_md_description", "")
+      rating = int(metadata.get("ss_md_rating", "0"))
+      tags = metadata.get("ss_md_tags", "")
+      return training_params, cover_image, display_name, keywords, description, rating, tags
+
+    model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, keywords, description, rating, tags])
+
+    def save_metadata(module, model, cover_image, display_name, keywords, description, rating, tags):
+      if model == "None":
+        return "No model selected."
+
+      model_path = lora_models.get(model, None)
+      if model_path is None:
+        return f"file not found: {model_path}"
+
+      updates = {
+        "ss_md_cover_image": None,
+        "ss_md_display_name": display_name,
+        "ss_md_keywords": keywords,
+        "ss_md_description": description,
+        "ss_md_rating": rating,
+        "ss_md_tags": tags
+      }
+
+      write_lora_metadata(model_path, module, updates)
+      return "Saved."
+
+    save_metadata_button.click(save_metadata, inputs=[module, model, cover_image, display_name, keywords, description, rating, tags], outputs=[save_output])
 
     def output_model_list(module, model, model_dir, sort_by):
         if model_dir == "":
@@ -353,42 +464,6 @@ def apply_weight(p, x, xs, i):
     update_script_args(p, x, 3 + 3 * i) # enabled, (module, model, {weight), ...
 
 
-LORA_METADATA_NAMES = {
-    "ss_learning_rate": "Learning rate",
-    "ss_text_encoder_lr": "Text encoder LR",
-    "ss_unet_lr": "UNet LR",
-    "ss_num_train_images": "# of training images",
-    "ss_num_reg_images": "# of reg images",
-    "ss_num_batches_per_epoch": "Batches per epoch",
-    "ss_num_epochs": "Total epochs",
-    "ss_batch_size_per_device": "Batch size/device",
-    "ss_total_batch_size": "Total batch size",
-    "ss_gradient_accumulation_steps": "Gradient accum. steps",
-    "ss_max_train_steps": "Max train steps",
-    "ss_lr_warmup_steps": "LR warmup steps",
-    "ss_lr_scheduler": "LR scheduler",
-    "ss_network_module": "Network module",
-    "ss_network_dim": "Network dim",
-    "ss_mixed_precision": "Mixed precision", 
-    "ss_full_fp16": "Full FP16",
-    "ss_v2": "V2",
-    "ss_resolution": "Resolution",
-    "ss_clip_skip": "Clip skip",
-    "ss_max_token_length": "Max token length",
-    "ss_color_aug": "Color aug",
-    "ss_flip_aug": "Flip aug",
-    "ss_random_crop": "Random crop",
-    "ss_shuffle_caption": "Shuffle caption",
-    "ss_cache_latents": "Cache latents",
-    "ss_enable_bucket": "Enable bucket",
-    "ss_min_bucket_reso": "Min bucket reso.",
-    "ss_max_bucket_reso": "Max bucket reso.",
-    "ss_seed": "Seed", 
-    "ss_sd_model_name": "SD model name",
-    "ss_vae_name": "VAE name"
-}
-
-
 def format_lora_model(p, opt, x):
     model = find_closest_lora_model_name(x)
     if model is None or model.lower() in ["", "none"]:
@@ -408,7 +483,7 @@ def format_lora_model(p, opt, x):
     for name in metadata_names:
         name = name.strip()
         if name in metadata:
-            formatted_name = LORA_METADATA_NAMES.get(name, name)
+            formatted_name = LORA_TRAIN_METADATA_NAMES.get(name, name)
             value += f"\n{formatted_name}: {metadata[name]}, "
 
     return value.strip(" ").strip(",")
