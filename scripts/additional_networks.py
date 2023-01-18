@@ -140,10 +140,28 @@ def dump_cache():
             json.dump(cache_data, file, indent=4)
 
 
-def get_all_models(sort_by, filter_by, path):
+
+def is_safetensors(filename):
+    return os.path.splitext(filename)[1] == ".safetensors"
+
+
+def get_model_rating(filename):
+  if not is_safetensors(filename):
+    return 0
+
+  metadata = safetensors_hack.read_metadata(filename)
+  return int(metadata.get("ssmd_rating", "0"))
+
+
+def get_all_models(paths, sort_by, filter_by):
+  fileinfos = []
+  for path in paths:
+    fileinfos += traverse_all_files(path, [])
+
+  cache_hashes = cache("hashes")
+
   res = OrderedDict()
   res_legacy = OrderedDict()
-  fileinfos = traverse_all_files(path, [])
   filter_by = filter_by.strip(" ")
   if len(filter_by) != 0:
     fileinfos = [x for x in fileinfos if filter_by.lower() in os.path.basename(x[0]).lower()]
@@ -153,8 +171,10 @@ def get_all_models(sort_by, filter_by, path):
     fileinfos = sorted(fileinfos, key=lambda x: -x[1].st_mtime)
   elif sort_by == "path name":
     fileinfos = sorted(fileinfos)
-
-  cache_hashes = cache("hashes")
+  elif sort_by == "rating":
+    #def get_and_save_rating(x):
+    #  cache_hashes[x[0]]
+    fileinfos = sorted(fileinfos, key=lambda x: get_model_rating(x[0]), reverse=True)
 
   seen = {}
 
@@ -224,18 +244,14 @@ def find_closest_lora_model_name(search: str):
 
 def update_lora_models():
   global lora_models, lora_model_names, legacy_model_names
-  res = OrderedDict()
-  res_legacy = OrderedDict()
   paths = [lora_models_dir]
   extra_lora_path = shared.opts.data.get("additional_networks_extra_lora_path", None)
   if extra_lora_path and os.path.exists(extra_lora_path):
     paths.append(extra_lora_path)
-  for path in paths:
-    sort_by = shared.opts.data.get("additional_networks_sort_models_by", "name")
-    filter_by = shared.opts.data.get("additional_networks_model_name_filter", "")
-    found, found_legacy = get_all_models(sort_by, filter_by, path)
-    res = {**found, **res}
-    res_legacy = {**found_legacy, **res_legacy}
+
+  sort_by = shared.opts.data.get("additional_networks_sort_models_by", "name")
+  filter_by = shared.opts.data.get("additional_networks_model_name_filter", "")
+  res, res_legacy = get_all_models(paths, sort_by, filter_by)
 
   lora_models = OrderedDict(**{"None": None}, **res)
   lora_model_names = {}
@@ -321,7 +337,7 @@ class Script(scripts.Script):
       p.extra_generation_params.update({
           "AddNet Enabled": True,
           f"AddNet Module {i+1}": module,
-          f"AddNet Model {i+1}": model,
+          f"AddNet Model {i+1}": asdiolmaw model,
           f"AddNet Weight {i+1}": weight,
       })
 
@@ -468,7 +484,7 @@ def on_ui_tabs():
     with gr.Row().style(equal_height=False):
       with gr.Column(variant='panel'):
         with gr.Row():
-          module = gr.Dropdown(["LoRA"], label=f"Network module (used throughout this tab)", value="LoRA", interactive=True)
+          module = gr.Dropdown(["LoRA"], label=f"Network module", value="LoRA", interactive=True)
           model = gr.Dropdown(list(lora_models.keys()), label=f"Model", value="None", interactive=True)
           modules.ui.create_refresh_button(model, update_lora_models, lambda: {"choices": list(lora_models.keys())}, "refresh_lora_models")
 
@@ -480,7 +496,7 @@ def on_ui_tabs():
           with gr.Column():
             gr.HTML(value="Get comma-separated list of models (for XY Grid)")
             model_dir = gr.Textbox("", label=f"Model directory", placeholder="Optional, uses selected model's directory if blank")
-            model_sort_by = gr.Radio(label="Sort models by", choices=["name", "date", "path name"], value="name", type="value")
+            model_sort_by = gr.Radio(label="Sort models by", choices=["name", "date", "path name", "rating"], value="name", type="value")
             get_list_button = gr.Button("Get List")
           with gr.Column():
             model_list = gr.Textbox(value="", label="Model list", placeholder="Model list will be output here")
@@ -488,6 +504,7 @@ def on_ui_tabs():
       with gr.Column():
         with gr.Row():
           display_name = gr.Textbox(value="", label="Name", placeholder="Display name for this model")
+          author = gr.Textbox(value="", label="Author", placeholder="Author of this model")
         with gr.Row():
           keywords = gr.Textbox(value="", label="Keywords", placeholder="Activation keywords, comma-separated")
         with gr.Row():
@@ -526,26 +543,25 @@ def on_ui_tabs():
 
       model_path = lora_models.get(model, None)
       if model_path is None:
-        return f"file not found: {model_path}", None, "", "", "", 0, "", "", ""
+        return {}, None, "", "", "", 0, "", "", ""
 
       if os.path.splitext(model_path)[1] != ".safetensors":
-        return "Model is not in .safetensors format", None, "", "", "", 0, "", "", ""
+        return {}, None, "", "", "", 0, "", "", ""
 
       metadata = read_lora_metadata(model_path, module)
 
       if metadata is None:
-        training_params = "No training parameters found."
+        training_params = {}
         metadata = {}
       else:
         training_params = {k: v for k, v in metadata.items() if k.startswith("ss_")}
-        if not training_params:
-          training_params = "No training parameters found."
 
       cover_images = json.loads(metadata.get("ssmd_cover_images", "[]"))
       cover_image = None
       if len(cover_images) > 0:
         cover_image = decode_base64_to_pil(cover_images[0])
       display_name = metadata.get("ssmd_display_name", "")
+      author = metadata.get("ssmd_author", "")
       keywords = metadata.get("ssmd_keywords", "")
       description = metadata.get("ssmd_description", "")
       rating = int(metadata.get("ssmd_rating", "0"))
@@ -553,11 +569,11 @@ def on_ui_tabs():
       model_hash = metadata.get("sshs_model_hash", cache("hashes").get(model_path, {}).get("model", ""))
       legacy_hash = metadata.get("sshs_legacy_hash", cache("hashes").get(model_path, {}).get("legacy", ""))
 
-      return training_params, cover_image, display_name, keywords, description, rating, tags, model_hash, legacy_hash
+      return training_params, cover_image, display_name, author, keywords, description, rating, tags, model_hash, legacy_hash
 
-    model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, keywords, description, rating, tags, model_hash, legacy_hash])
+    model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, author, keywords, description, rating, tags, model_hash, legacy_hash])
 
-    def save_metadata(module, model, cover_image, display_name, keywords, description, rating, tags):
+    def save_metadata(module, model, cover_image, display_name, author, keywords, description, rating, tags):
       if model == "None":
         return "No model selected.", "", ""
 
@@ -587,6 +603,7 @@ def on_ui_tabs():
         "ssmd_cover_images": json.dumps(cover_images),
         "ssmd_display_name": display_name,
         "ssmd_keywords": keywords,
+        "ssmd_author": author,
         "ssmd_description": description,
         "ssmd_rating": rating,
         "ssmd_tags": tags,
@@ -597,7 +614,7 @@ def on_ui_tabs():
       write_lora_metadata(model_path, module, updates)
       return "Saved.", model_hash, legacy_hash
 
-    save_metadata_button.click(save_metadata, inputs=[module, model, cover_image, display_name, keywords, description, rating, tags], outputs=[save_output, model_hash, legacy_hash])
+    save_metadata_button.click(save_metadata, inputs=[module, model, cover_image, display_name, author, keywords, description, rating, tags], outputs=[save_output, model_hash, legacy_hash])
 
     def output_model_list(module, model, model_dir, sort_by):
         if model_dir == "":
@@ -610,7 +627,7 @@ def on_ui_tabs():
         if not os.path.isdir(model_dir):
             return f"directory not found: {model_dir}"
 
-        found, found_legacy = get_all_models(sort_by, "", model_dir)
+        found, found_legacy = get_all_models([model_dir], sort_by, "")
         return ", ".join(found.keys())
 
     get_list_button.click(output_model_list, inputs=[module, model, model_dir, model_sort_by], outputs=[model_list])
@@ -689,7 +706,7 @@ for scriptDataTuple in scripts.scripts_data:
 def on_ui_settings():
     section = ('additional_networks', "Additional Networks")
     shared.opts.add_option("additional_networks_extra_lora_path", shared.OptionInfo("", "Extra path to scan for LoRA models (e.g. training output directory)", section=section))
-    shared.opts.add_option("additional_networks_sort_models_by", shared.OptionInfo("name", "Sort LoRA models by", gr.Radio, {"choices": ["name", "date", "path name"]}, section=section))
+    shared.opts.add_option("additional_networks_sort_models_by", shared.OptionInfo("name", "Sort LoRA models by", gr.Radio, {"choices": ["name", "date", "path name", "rating"]}, section=section))
     shared.opts.add_option("additional_networks_model_name_filter", shared.OptionInfo("", "LoRA model name filter", section=section))
     shared.opts.add_option("additional_networks_xy_grid_model_metadata", shared.OptionInfo("", "Metadata to show in XY-Grid label for Model axes, comma-separated (example: \"ss_learning_rate, ss_num_epochs\")", section=section))
     shared.opts.add_option("additional_networks_back_up_model_when_saving", shared.OptionInfo(True, "Makes a backup copy of the model being edited when saving its metadata.", section=section))
@@ -706,8 +723,6 @@ def on_infotext_pasted(infotext, params):
 
         # Convert potential legacy name/hash to new format
         params[f"AddNet Model {i+1}"] = str(find_closest_lora_model_name(params[f"AddNet Model {i+1}"]))
-    from pprint import pp
-    pp(params)
 
 
 script_callbacks.on_ui_tabs(on_ui_tabs)

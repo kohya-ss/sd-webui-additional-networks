@@ -10,6 +10,7 @@ import safetensors.torch
 from modules import sd_models
 
 def read_metadata(filename):
+    """Reads the JSON metadata from a .safetensors file"""
     with open(filename, mode="r", encoding="utf8") as file_obj:
         with mmap.mmap(file_obj.fileno(), length=0, access=mmap.ACCESS_READ) as m:
             header = m.read(8)
@@ -21,6 +22,8 @@ def read_metadata(filename):
 
 
 def load_file(filename, device):
+    """"Loads a .safetensors file without memory mapping that locks the model file.
+    Works around safetensors issue: https://github.com/huggingface/safetensors/issues/164"""
     with open(filename, mode="r", encoding="utf8") as file_obj:
         with mmap.mmap(file_obj.fileno(), length=0, access=mmap.ACCESS_READ) as m:
             header = m.read(8)
@@ -36,6 +39,8 @@ def load_file(filename, device):
 
 
 def hash_file(filename):
+    """Hashes a .safetensors file using the new hashing method.
+    Only hashes the weights of the model."""
     hash_sha256 = hashlib.sha256()
     blksize = 1024 * 1024
 
@@ -54,6 +59,7 @@ def hash_file(filename):
 
 
 def legacy_hash_file(filename):
+    """Hashes a model file using the legacy `sd_models.model_hash()` method."""
     hash_sha256 = hashlib.sha256()
 
     metadata = read_metadata(filename)
@@ -62,9 +68,9 @@ def legacy_hash_file(filename):
     # sd_models.model_hash as if there were no user-specified metadata in the
     # .safetensors file. That leaves the training parameters, which are
     # immutable. It is important the hash does not include the embedded user
-    # metadata as that would mean the hash changes every time the user updates
-    # the name/description/etc. The new hashing method fixes this problem by
-    # only hashing the region of the file containing the tensors.
+    # metadata as that would mean the hash could change every time the user
+    # updates the name/description/etc. The new hashing method fixes this
+    # problem by only hashing the region of the file containing the tensors.
     if any(not k.startswith("ss_") for k in metadata):
       # Strip the user metadata, re-serialize the file as if it were freshly
       # created from sd-scripts, and hash that with model_hash's behavior.
@@ -85,6 +91,8 @@ DTYPES = {"F32": torch.float32, "F16": torch.float16}
 
 
 def create_tensor(storage, info, offset):
+    """Creates a tensor without holding on to an open handle to the parent model
+    file."""
     dtype = DTYPES[info["dtype"]]
     shape = info["shape"]
     start, stop = info["data_offsets"]
