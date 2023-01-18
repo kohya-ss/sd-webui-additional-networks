@@ -692,8 +692,6 @@ def on_ui_settings():
     shared.opts.add_option("additional_networks_sort_models_by", shared.OptionInfo("name", "Sort LoRA models by", gr.Radio, {"choices": ["name", "date", "path name"]}, section=section))
     shared.opts.add_option("additional_networks_model_name_filter", shared.OptionInfo("", "LoRA model name filter", section=section))
     shared.opts.add_option("additional_networks_xy_grid_model_metadata", shared.OptionInfo("", "Metadata to show in XY-Grid label for Model axes, comma-separated (example: \"ss_learning_rate, ss_num_epochs\")", section=section))
-    shared.opts.add_option("additional_networks_use_old_model_hashing_algorithm", shared.OptionInfo(False, "Use the old hashing algorithm for model hashes/infotext restoration", section=section))
-    shared.opts.add_option("additional_networks_force_recalculate_hashes", shared.OptionInfo(False, "Update all model files with new hashes. WARNING: This will take a long time, disable after it's done.", section=section))
     shared.opts.add_option("additional_networks_back_up_model_when_saving", shared.OptionInfo(True, "Makes a backup copy of the model being edited when saving its metadata.", section=section))
 
 
