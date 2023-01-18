@@ -4,8 +4,14 @@ import zipfile
 import json
 import stat
 import sys
+import io
 import inspect
+import base64
+import shutil
+import re
 from collections import OrderedDict
+import tqdm
+from PIL import PngImagePlugin, Image
 
 import torch
 
@@ -14,10 +20,12 @@ from modules import shared, script_callbacks
 import gradio as gr
 
 from modules.processing import Processed, process_images
-from modules import sd_models
+from modules import sd_models, hashes
 import modules.ui
+import modules.extras
+import modules.generation_parameters_copypaste as parameters_copypaste
 
-from scripts import lora_compvis
+from scripts import lora_compvis, safetensors_hack
 
 
 # Metadata pertaining to LoRA training
@@ -66,8 +74,10 @@ LORA_TRAIN_METADATA_NAMES = {
 
 MAX_MODEL_COUNT = 5
 LORA_MODEL_EXTS = [".pt", ".ckpt", ".safetensors"]
-lora_models = {}      # "My_Lora(abcd1234)" -> C:/path/to/model.safetensors
-lora_model_names = {} # "my_lora" -> "My_Lora(abcd1234)"
+re_legacy_hash = re.compile("\(([0-9a-f]{8})\)$")
+lora_models = {}             # "My_Lora(abcd1234)" -> "C:/path/to/model.safetensors"
+lora_model_names = {}        # "my_lora" -> "My_Lora(abcd1234)"
+legacy_model_names = {}
 lora_models_dir = os.path.join(scripts.basedir(), "models/lora")
 os.makedirs(lora_models_dir, exist_ok=True)
 
@@ -83,8 +93,56 @@ def traverse_all_files(curr_path, model_list):
   return model_list
 
 
+def get_model_hash(metadata, filename):
+  if not metadata:
+    return hashes.calculate_sha256(filename)
+
+  if "sshs_model_hash" in metadata:
+    return metadata["sshs_model_hash"]
+
+  return safetensors_hack.hash_file(filename)
+
+
+def get_legacy_hash(metadata, filename):
+  if not metadata:
+    return sd_models.model_hash(filename)
+
+  if "sshs_legacy_hash" in metadata:
+    return metadata["sshs_legacy_hash"]
+
+  return sd_models.model_hash(filename)
+
+
+import filelock
+cache_filename = os.path.join(scripts.basedir(), "hashes.json")
+cache_data = None
+
+def cache(subsection):
+    global cache_data
+
+    if cache_data is None:
+        with filelock.FileLock(cache_filename+".lock"):
+            if not os.path.isfile(cache_filename):
+                cache_data = {}
+            else:
+                with open(cache_filename, "r", encoding="utf8") as file:
+                    cache_data = json.load(file)
+
+    s = cache_data.get(subsection, {})
+    cache_data[subsection] = s
+
+    return s
+
+
+def dump_cache():
+    with filelock.FileLock(cache_filename+".lock"):
+        with open(cache_filename, "w", encoding="utf8") as file:
+            json.dump(cache_data, file, indent=4)
+
+
 def get_all_models(sort_by, filter_by, path):
   res = OrderedDict()
+  res_legacy = OrderedDict()
   fileinfos = traverse_all_files(path, [])
   filter_by = filter_by.strip(" ")
   if len(filter_by) != 0:
@@ -96,24 +154,67 @@ def get_all_models(sort_by, filter_by, path):
   elif sort_by == "path name":
     fileinfos = sorted(fileinfos)
 
-  for finfo in fileinfos:
+  cache_hashes = cache("hashes")
+
+  seen = {}
+
+  print("[AddNet] Updating model hashes...")
+  for finfo in tqdm.tqdm(fileinfos):
     filename = finfo[0]
+    stat = finfo[1]
     name = os.path.splitext(os.path.basename(filename))[0]
+
     # Prevent a hypothetical "None.pt" from being listed.
     if name != "None":
-      res[name + f"({sd_models.model_hash(filename)})"] = filename
+      is_safetensors = os.path.splitext(filename)[1] == ".safetensors"
+      metadata = None
 
-  return res
+      cached = cache_hashes.get(filename, None)
+      if cached is None or stat.st_mtime != cached["mtime"]:
+        if metadata is None and is_safetensors:
+          metadata = safetensors_hack.read_metadata(filename)
+        model_hash = get_model_hash(metadata, filename)
+        legacy_hash = get_legacy_hash(metadata, filename)
+      else:
+        model_hash = cached["model"]
+        legacy_hash = cached["legacy"]
+
+      full_name = name + f"({model_hash[0:10]})"
+      res[full_name] = filename
+      res_legacy[legacy_hash] = full_name
+      cache_hashes[filename] = {"model": model_hash, "legacy": legacy_hash, "mtime": stat.st_mtime}
+      seen[filename] = True
+
+  return res, res_legacy
 
 
 def find_closest_lora_model_name(search: str):
-    if not search:
+    if not search or search == "None":
         return None
+
+    # Match name and hash, case-sensitive
+    # "MyModel-epoch00002(abcde12345)"
     if search in lora_models:
         return search
+
+    # Match full name, case-insensitive
+    # "mymodel-epoch00002"
     search = search.lower()
     if search in lora_model_names:
         return lora_model_names.get(search)
+
+    # Match legacy hash (8 characters)
+    # "MyModel(abcd1234)"
+    result = re_legacy_hash.search(search)
+    if result is not None:
+        model_hash = result.group(1)
+        if model_hash in legacy_model_names:
+            new_model_name = legacy_model_names[model_hash]
+            return new_model_name
+
+    # Use any model with the search term as the prefix, case-insensitive, sorted
+    # by name length
+    # "mymodel"
     applicable = [name for name in lora_model_names.keys() if search in name.lower()]
     if not applicable:
         return None
@@ -122,8 +223,9 @@ def find_closest_lora_model_name(search: str):
 
 
 def update_lora_models():
-  global lora_models, lora_model_names
+  global lora_models, lora_model_names, legacy_model_names
   res = OrderedDict()
+  res_legacy = OrderedDict()
   paths = [lora_models_dir]
   extra_lora_path = shared.opts.data.get("additional_networks_extra_lora_path", None)
   if extra_lora_path and os.path.exists(extra_lora_path):
@@ -131,15 +233,21 @@ def update_lora_models():
   for path in paths:
     sort_by = shared.opts.data.get("additional_networks_sort_models_by", "name")
     filter_by = shared.opts.data.get("additional_networks_model_name_filter", "")
-    found = get_all_models(sort_by, filter_by, path)
+    found, found_legacy = get_all_models(sort_by, filter_by, path)
     res = {**found, **res}
+    res_legacy = {**found_legacy, **res_legacy}
+
   lora_models = OrderedDict(**{"None": None}, **res)
   lora_model_names = {}
+
   for name_and_hash, filename in lora_models.items():
       if filename == None:
           continue
       name = os.path.splitext(os.path.basename(filename))[0].lower()
       lora_model_names[name] = name_and_hash
+
+  legacy_model_names = res_legacy
+  dump_cache()
 
 
 update_lora_models()
@@ -299,9 +407,7 @@ def read_lora_metadata(model_path, module):
   metadata = None
   if module == "LoRA":
     if os.path.splitext(model_path)[1] == '.safetensors':
-      from safetensors.torch import safe_open
-      with safe_open(model_path, framework="pt") as f:
-        metadata = f.metadata()
+      metadata = safetensors_hack.read_metadata(model_path)
 
   return metadata
 
@@ -312,20 +418,49 @@ def write_lora_metadata(model_path, module, updates):
   if not os.path.exists(model_path):
     return None
 
-  from safetensors.torch import safe_open, save_file
+  from safetensors.torch import save_file
+
+  back_up = shared.opts.data.get("additional_networks_back_up_model_when_saving", True)
+  if back_up:
+    backup_path = model_path + ".backup"
+    if not os.path.exists(backup_path):
+      print(f"[AddNet] Backing up current model to {backup_path}")
+      shutil.copyfile(model_path, backup_path)
+
   metadata = None
   tensors = {}
   if module == "LoRA":
     if os.path.splitext(model_path)[1] == '.safetensors':
-      with safe_open(model_path, framework="pt") as f:
-        metadata = f.metadata()
-        for k in f.keys():
-          tensors[k] = f.get_tensor(k)
+      tensors, metadata = safetensors_hack.load_file(model_path, "cpu")
 
       for k, v in updates.items():
         metadata[k] = str(v)
 
       save_file(tensors, model_path, metadata)
+
+
+def decode_base64_to_pil(encoding):
+    if encoding.startswith("data:image/"):
+        encoding = encoding.split(";")[1].split(",")[1]
+    return Image.open(io.BytesIO(base64.b64decode(encoding)))
+
+
+def encode_pil_to_base64(image):
+    with io.BytesIO() as output_bytes:
+
+        # Copy any text-only metadata
+        use_metadata = False
+        metadata = PngImagePlugin.PngInfo()
+        for key, value in image.info.items():
+            if isinstance(key, str) and isinstance(value, str):
+                metadata.add_text(key, value)
+                use_metadata = True
+
+        image.save(
+            output_bytes, "PNG", pnginfo=(metadata if use_metadata else None)
+        )
+        bytes_data = output_bytes.getvalue()
+    return base64.b64encode(bytes_data)
 
 
 def on_ui_tabs():
@@ -336,6 +471,10 @@ def on_ui_tabs():
           module = gr.Dropdown(["LoRA"], label=f"Network module (used throughout this tab)", value="LoRA", interactive=True)
           model = gr.Dropdown(list(lora_models.keys()), label=f"Model", value="None", interactive=True)
           modules.ui.create_refresh_button(model, update_lora_models, lambda: {"choices": list(lora_models.keys())}, "refresh_lora_models")
+
+        with gr.Row():
+          model_hash = gr.Textbox("", label="Model hash", interactive=False)
+          legacy_hash = gr.Textbox("", label="Legacy hash", interactive=False)
 
         with gr.Row():
           with gr.Column():
@@ -363,15 +502,34 @@ def on_ui_tabs():
         with gr.Row():
           cover_image = gr.Image(label="Cover image", elem_id="additional_networks_cover_image", source="upload", interactive=True, type="pil", image_mode="RGBA").style(height=480)
         with gr.Row():
+          try:
+              send_to_buttons = parameters_copypaste.create_buttons(["txt2img", "img2img", "inpaint", "extras"])
+          except:
+              pass
+        with gr.Row():
           metadata_view = gr.JSON(value="{}", label="Training parameters")
+        with gr.Row(visible=False):
+          info1 = gr.Textbox()
+          info2 = gr.Textbox()
+          img_file_info = gr.Textbox(label="Generate Info", interactive=False, lines=6)
+
+    cover_image.change(fn=modules.extras.run_pnginfo, inputs=[cover_image], outputs=[info1, img_file_info, info2])
+
+    try:
+        parameters_copypaste.bind_buttons(send_to_buttons, cover_image, img_file_info)
+    except:
+        pass
 
     def refresh_metadata(module, model):
       if model == "None":
-        return {}
+        return {}, None, "", "", "", 0, "", "", ""
 
       model_path = lora_models.get(model, None)
       if model_path is None:
-        return f"file not found: {model_path}"
+        return f"file not found: {model_path}", None, "", "", "", 0, "", "", ""
+
+      if os.path.splitext(model_path)[1] != ".safetensors":
+        return "Model is not in .safetensors format", None, "", "", "", 0, "", "", ""
 
       metadata = read_lora_metadata(model_path, module)
 
@@ -383,39 +541,63 @@ def on_ui_tabs():
         if not training_params:
           training_params = "No training parameters found."
 
-      cover_image = metadata.get("ssmd_cover_image", None)
-      if cover_image == "None":
-        cover_image = None
+      cover_images = json.loads(metadata.get("ssmd_cover_images", "[]"))
+      cover_image = None
+      if len(cover_images) > 0:
+        cover_image = decode_base64_to_pil(cover_images[0])
       display_name = metadata.get("ssmd_display_name", "")
       keywords = metadata.get("ssmd_keywords", "")
       description = metadata.get("ssmd_description", "")
       rating = int(metadata.get("ssmd_rating", "0"))
       tags = metadata.get("ssmd_tags", "")
-      return training_params, cover_image, display_name, keywords, description, rating, tags
+      model_hash = metadata.get("sshs_model_hash", cache("hashes").get(model_path, {}).get("model", ""))
+      legacy_hash = metadata.get("sshs_legacy_hash", cache("hashes").get(model_path, {}).get("legacy", ""))
 
-    model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, keywords, description, rating, tags])
+      return training_params, cover_image, display_name, keywords, description, rating, tags, model_hash, legacy_hash
+
+    model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, keywords, description, rating, tags, model_hash, legacy_hash])
 
     def save_metadata(module, model, cover_image, display_name, keywords, description, rating, tags):
       if model == "None":
-        return "No model selected."
+        return "No model selected.", "", ""
 
       model_path = lora_models.get(model, None)
       if model_path is None:
-        return f"file not found: {model_path}"
+        return f"file not found: {model_path}", "", ""
 
+      if os.path.splitext(model_path)[1] != ".safetensors":
+        return "Model is not in .safetensors format", "", ""
+
+      metadata = safetensors_hack.read_metadata(model_path)
+      model_hash = safetensors_hack.hash_file(model_path)
+      legacy_hash = get_legacy_hash(metadata, model_path)
+
+      # TODO: Support multiple images
+      # Blocked on gradio not having a gallery upload option
+      # https://github.com/gradio-app/gradio/issues/1379
+      cover_images = []
+      if cover_image is not None:
+        cover_images.append(encode_pil_to_base64(cover_image).decode("ascii"))
+
+      # NOTE: User-specified metadata should NOT be prefixed with "ss_". This is
+      # to maintain backwards compatibility with the old hashing method. "ss_"
+      # should be used for training parameters that will never be manually
+      # updated on the model.
       updates = {
-        "ssmd_cover_image": None,
+        "ssmd_cover_images": json.dumps(cover_images),
         "ssmd_display_name": display_name,
         "ssmd_keywords": keywords,
         "ssmd_description": description,
         "ssmd_rating": rating,
-        "ssmd_tags": tags
+        "ssmd_tags": tags,
+        "sshs_model_hash": model_hash,
+        "sshs_legacy_hash": legacy_hash
       }
 
       write_lora_metadata(model_path, module, updates)
-      return "Saved."
+      return "Saved.", model_hash, legacy_hash
 
-    save_metadata_button.click(save_metadata, inputs=[module, model, cover_image, display_name, keywords, description, rating, tags], outputs=[save_output])
+    save_metadata_button.click(save_metadata, inputs=[module, model, cover_image, display_name, keywords, description, rating, tags], outputs=[save_output, model_hash, legacy_hash])
 
     def output_model_list(module, model, model_dir, sort_by):
         if model_dir == "":
@@ -428,7 +610,7 @@ def on_ui_tabs():
         if not os.path.isdir(model_dir):
             return f"directory not found: {model_dir}"
 
-        found = get_all_models(sort_by, "", model_dir)
+        found, found_legacy = get_all_models(sort_by, "", model_dir)
         return ", ".join(found.keys())
 
     get_list_button.click(output_model_list, inputs=[module, model, model_dir, model_sort_by], outputs=[model_list])
@@ -510,6 +692,9 @@ def on_ui_settings():
     shared.opts.add_option("additional_networks_sort_models_by", shared.OptionInfo("name", "Sort LoRA models by", gr.Radio, {"choices": ["name", "date", "path name"]}, section=section))
     shared.opts.add_option("additional_networks_model_name_filter", shared.OptionInfo("", "LoRA model name filter", section=section))
     shared.opts.add_option("additional_networks_xy_grid_model_metadata", shared.OptionInfo("", "Metadata to show in XY-Grid label for Model axes, comma-separated (example: \"ss_learning_rate, ss_num_epochs\")", section=section))
+    shared.opts.add_option("additional_networks_use_old_model_hashing_algorithm", shared.OptionInfo(False, "Use the old hashing algorithm for model hashes/infotext restoration", section=section))
+    shared.opts.add_option("additional_networks_force_recalculate_hashes", shared.OptionInfo(False, "Update all model files with new hashes. WARNING: This will take a long time, disable after it's done.", section=section))
+    shared.opts.add_option("additional_networks_back_up_model_when_saving", shared.OptionInfo(True, "Makes a backup copy of the model being edited when saving its metadata.", section=section))
 
 
 def on_infotext_pasted(infotext, params):
@@ -520,6 +705,11 @@ def on_infotext_pasted(infotext, params):
             params[f"AddNet Model {i+1}"] = "None"
         if f"AddNet Weight {i+1}" not in params:
             params[f"AddNet Weight {i+1}"] = "0"
+
+        # Convert potential legacy name/hash to new format
+        params[f"AddNet Model {i+1}"] = str(find_closest_lora_model_name(params[f"AddNet Model {i+1}"]))
+    from pprint import pp
+    pp(params)
 
 
 script_callbacks.on_ui_tabs(on_ui_tabs)

@@ -1,0 +1,9 @@
+#additional_networks_cover_image,
+#additional_networks_cover_image > .h-60,
+#additional_networks_cover_image > .h-60 > div,
+#additional_networks_cover_image > .h-60 > div > img
+{
+    height: 480px !important;
+    max-height: 480px !important;
+    min-height: 480px !important;
+}
