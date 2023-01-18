@@ -54,7 +54,13 @@ LORA_TRAIN_METADATA_NAMES = {
     "ss_max_bucket_reso": "Max bucket reso.",
     "ss_seed": "Seed",
     "ss_sd_model_name": "SD model name",
-    "ss_vae_name": "VAE name"
+    "ss_vae_name": "VAE name",
+    "ss_training_started_at": "Training started at",
+    "ss_output_name": "Output name",
+    "ss_session_id": "Session ID",
+    "ss_dataset_dirs": "Dataset dirs",
+    "ss_reg_dataset_dirs": "Reg. dataset dirs",
+    "ss_keep_tokens": "Keep tokens",
 }
 
 
@@ -373,18 +379,18 @@ def on_ui_tabs():
         training_params = "No training parameters found."
         metadata = {}
       else:
-        training_params = {k: v for k, v in metadata.items() if k in LORA_TRAIN_METADATA_NAMES}
+        training_params = {k: v for k, v in metadata.items() if k.startswith("ss_")}
         if not training_params:
           training_params = "No training parameters found."
 
-      cover_image = metadata.get("ss_md_cover_image", None)
+      cover_image = metadata.get("ssmd_cover_image", None)
       if cover_image == "None":
         cover_image = None
-      display_name = metadata.get("ss_md_display_name", "")
-      keywords = metadata.get("ss_md_keywords", "")
-      description = metadata.get("ss_md_description", "")
-      rating = int(metadata.get("ss_md_rating", "0"))
-      tags = metadata.get("ss_md_tags", "")
+      display_name = metadata.get("ssmd_display_name", "")
+      keywords = metadata.get("ssmd_keywords", "")
+      description = metadata.get("ssmd_description", "")
+      rating = int(metadata.get("ssmd_rating", "0"))
+      tags = metadata.get("ssmd_tags", "")
       return training_params, cover_image, display_name, keywords, description, rating, tags
 
     model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, keywords, description, rating, tags])
@@ -398,12 +404,12 @@ def on_ui_tabs():
         return f"file not found: {model_path}"
 
       updates = {
-        "ss_md_cover_image": None,
-        "ss_md_display_name": display_name,
-        "ss_md_keywords": keywords,
-        "ss_md_description": description,
-        "ss_md_rating": rating,
-        "ss_md_tags": tags
+        "ssmd_cover_image": None,
+        "ssmd_display_name": display_name,
+        "ssmd_keywords": keywords,
+        "ssmd_description": description,
+        "ssmd_rating": rating,
+        "ssmd_tags": tags
       }
 
       write_lora_metadata(model_path, module, updates)
