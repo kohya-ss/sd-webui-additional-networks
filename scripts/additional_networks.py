@@ -10,6 +10,7 @@ import base64
 import shutil
 import re
 from collections import OrderedDict
+from multiprocessing.pool import ThreadPool as Pool
 import tqdm
 from PIL import PngImagePlugin, Image
 
@@ -153,10 +154,43 @@ def get_model_rating(filename):
   return int(metadata.get("ssmd_rating", "0"))
 
 
+def hash_model_file(finfo):
+  filename = finfo[0]
+  stat = finfo[1]
+  name = os.path.splitext(os.path.basename(filename))[0]
+
+  # Prevent a hypothetical "None.pt" from being listed.
+  if name != "None":
+    is_safetensors = os.path.splitext(filename)[1] == ".safetensors"
+    metadata = None
+
+    cached = cache("hashes").get(filename, None)
+    if cached is None or stat.st_mtime != cached["mtime"]:
+      if metadata is None and is_safetensors:
+        metadata = safetensors_hack.read_metadata(filename)
+      model_hash = get_model_hash(metadata, filename)
+      legacy_hash = get_legacy_hash(metadata, filename)
+    else:
+      model_hash = cached["model"]
+      legacy_hash = cached["legacy"]
+
+  return {"model": model_hash, "legacy": legacy_hash, "fileinfo": finfo}
+
+
 def get_all_models(paths, sort_by, filter_by):
   fileinfos = []
   for path in paths:
     fileinfos += traverse_all_files(path, [])
+
+  print("[AddNet] Updating model hashes...")
+  data = []
+  thread_count = shared.opts.data.get("additional_networks_hash_thread_count", 1)
+  p = Pool(processes=thread_count)
+  with tqdm.tqdm(total=len(fileinfos)) as pbar:
+      for res in p.imap_unordered(hash_model_file, fileinfos):
+          pbar.update()
+          data.append(res)
+  p.close()
 
   cache_hashes = cache("hashes")
 
@@ -164,46 +198,33 @@ def get_all_models(paths, sort_by, filter_by):
   res_legacy = OrderedDict()
   filter_by = filter_by.strip(" ")
   if len(filter_by) != 0:
-    fileinfos = [x for x in fileinfos if filter_by.lower() in os.path.basename(x[0]).lower()]
+    data = [x for x in data if filter_by.lower() in os.path.basename(x["fileinfo"][0]).lower()]
   if sort_by == "name":
-    fileinfos = sorted(fileinfos, key=lambda x: os.path.basename(x[0]))
+    data = sorted(data, key=lambda x: os.path.basename(x["fileinfo"][0]))
   elif sort_by == "date":
-    fileinfos = sorted(fileinfos, key=lambda x: -x[1].st_mtime)
+    data = sorted(data, key=lambda x: -x["fileinfo"][1].st_mtime)
   elif sort_by == "path name":
-    fileinfos = sorted(fileinfos)
+    data = sorted(data)
   elif sort_by == "rating":
     #def get_and_save_rating(x):
     #  cache_hashes[x[0]]
-    fileinfos = sorted(fileinfos, key=lambda x: get_model_rating(x[0]), reverse=True)
+    data = sorted(data, key=lambda x: get_model_rating(x["fileinfo"][0]), reverse=True)
 
-  seen = {}
-
-  print("[AddNet] Updating model hashes...")
-  for finfo in tqdm.tqdm(fileinfos):
+  for result in data:
+    finfo = result["fileinfo"]
     filename = finfo[0]
     stat = finfo[1]
+    model_hash = result["model"]
+    legacy_hash = result["legacy"]
+
     name = os.path.splitext(os.path.basename(filename))[0]
 
     # Prevent a hypothetical "None.pt" from being listed.
     if name != "None":
-      is_safetensors = os.path.splitext(filename)[1] == ".safetensors"
-      metadata = None
-
-      cached = cache_hashes.get(filename, None)
-      if cached is None or stat.st_mtime != cached["mtime"]:
-        if metadata is None and is_safetensors:
-          metadata = safetensors_hack.read_metadata(filename)
-        model_hash = get_model_hash(metadata, filename)
-        legacy_hash = get_legacy_hash(metadata, filename)
-      else:
-        model_hash = cached["model"]
-        legacy_hash = cached["legacy"]
-
       full_name = name + f"({model_hash[0:10]})"
       res[full_name] = filename
       res_legacy[legacy_hash] = full_name
       cache_hashes[filename] = {"model": model_hash, "legacy": legacy_hash, "mtime": stat.st_mtime}
-      seen[filename] = True
 
   return res, res_legacy
 
@@ -337,7 +358,7 @@ class Script(scripts.Script):
       p.extra_generation_params.update({
           "AddNet Enabled": True,
           f"AddNet Module {i+1}": module,
-          f"AddNet Model {i+1}": asdiolmaw model,
+          f"AddNet Model {i+1}": model,
           f"AddNet Weight {i+1}": weight,
       })
 
@@ -709,7 +730,8 @@ def on_ui_settings():
     shared.opts.add_option("additional_networks_sort_models_by", shared.OptionInfo("name", "Sort LoRA models by", gr.Radio, {"choices": ["name", "date", "path name", "rating"]}, section=section))
     shared.opts.add_option("additional_networks_model_name_filter", shared.OptionInfo("", "LoRA model name filter", section=section))
     shared.opts.add_option("additional_networks_xy_grid_model_metadata", shared.OptionInfo("", "Metadata to show in XY-Grid label for Model axes, comma-separated (example: \"ss_learning_rate, ss_num_epochs\")", section=section))
-    shared.opts.add_option("additional_networks_back_up_model_when_saving", shared.OptionInfo(True, "Makes a backup copy of the model being edited when saving its metadata.", section=section))
+    shared.opts.add_option("additional_networks_back_up_model_when_saving", shared.OptionInfo(True, "Make a backup copy of the model being edited when saving its metadata.", section=section))
+    shared.opts.add_option("additional_networks_hash_thread_count", shared.OptionInfo(1, "# of threads to use for hash calculation (increase if using an SSD)", section=section))
 
 
 def on_infotext_pasted(infotext, params):
