@@ -180,12 +180,11 @@ def hash_model_file(finfo):
 
   # Prevent a hypothetical "None.pt" from being listed.
   if name != "None":
-    is_safetensors = os.path.splitext(filename)[1] == ".safetensors"
     metadata = None
 
     cached = cache("hashes").get(filename, None)
     if cached is None or stat.st_mtime != cached["mtime"]:
-      if metadata is None and is_safetensors:
+      if metadata is None and is_safetensors(filename):
         metadata = safetensors_hack.read_metadata(filename)
       model_hash = get_model_hash(metadata, filename)
       legacy_hash = get_legacy_hash(metadata, filename)
@@ -581,6 +580,13 @@ Requested path was: {f}
 
         with gr.Row():
           with gr.Column():
+            gr.HTML(value="Copy metadata to other models in directory")
+            copy_metadata_dir = gr.Textbox("", label="Containing directory", placeholder="All models in this directory will receive the selected model's metadata")
+            copy_same_session = gr.Checkbox(True, label="Only copy to models with same session ID")
+            copy_metadata_button = gr.Button("Copy Metadata", variant="primary")
+
+        with gr.Row():
+          with gr.Column():
             gr.HTML(value="Get comma-separated list of models (for XY Grid)")
             model_dir = gr.Textbox("", label=f"Model directory", placeholder="Optional, uses selected model's directory if blank")
             model_sort_by = gr.Radio(label="Sort models by", choices=["name", "date", "path name", "rating"], value="name", type="value")
@@ -601,7 +607,8 @@ Requested path was: {f}
           tags = gr.Textbox(value="", label="Tags", placeholder="Comma-separated list of tags (\"artist, style, landscape, 2d, 3d...\")", lines=2, interactive=can_edit)
         with gr.Row():
           editing_enabled = gr.Checkbox(label="Editing Enabled", value=can_edit)
-          save_metadata_button = gr.Button("Save Metadata", variant="primary")
+          with gr.Row():
+            save_metadata_button = gr.Button("Save Metadata", variant="primary", interactive=can_edit)
         with gr.Row():
           save_output = gr.HTML("")
       with gr.Column():
@@ -620,6 +627,59 @@ Requested path was: {f}
           img_file_info = gr.Textbox(label="Generate Info", interactive=False, lines=6)
 
     open_folder_button.click(fn=lambda p: open_folder(os.path.dirname(p)), inputs=[model_path], outputs=[])
+
+    def copy_metadata_to_all(module, model, copy_dir, same_session_only):
+      if model == "None":
+        return "No model loaded."
+
+      model_path = lora_models.get(model, None)
+      if model_path is None:
+        return f"Model path not found: {model}"
+
+      model_path = os.path.realpath(model_path)
+
+      if os.path.splitext(model_path)[1] != ".safetensors":
+        return "Model is not in .safetensors format."
+
+      if not os.path.isdir(copy_dir):
+        return "Please provide a directory containing models in .safetensors format."
+
+      metadata = read_lora_metadata(model_path, module)
+      count = 0
+      for entry in os.scandir(copy_dir):
+        if entry.is_file():
+          path = os.path.realpath(os.path.join(copy_dir, entry.name))
+          if path != model_path and is_safetensors(path):
+            if same_session_only:
+              other_metadata = safetensors_hack.read_metadata(path)
+              session_id = metadata.get("ss_session_id", None)
+              other_session_id = other_metadata.get("ss_session_id", None)
+              if session_id is None or other_session_id is None or session_id != other_session_id:
+                continue
+
+            updates = {
+              "ssmd_cover_images": "[]",
+              "ssmd_display_name": "",
+              "ssmd_keywords": "",
+              "ssmd_author": "",
+              "ssmd_description": "",
+              "ssmd_rating": "0",
+              "ssmd_tags": "",
+            }
+
+            for k, v in metadata.items():
+              if k.startswith("ssmd_"):
+                updates[k] = v
+
+            del updates["ssmd_rating"]
+
+            write_lora_metadata(path, module, updates)
+            count += 1
+
+      print(f"[AddNet] Updated {count} models in directory {copy_dir}.")
+      return f"Updated {count} models in directory {copy_dir}."
+
+    copy_metadata_button.click(fn=copy_metadata_to_all, inputs=[module, model, copy_metadata_dir, copy_same_session], outputs=[save_output])
 
     def update_editing(enabled):
       updates = [gr.Textbox.update(interactive=enabled)] * 5
@@ -643,7 +703,7 @@ Requested path was: {f}
         return {"info": f"Model path not found: {model}"}, None, "", "", "", "", 0, "", "", "", ""
 
       if os.path.splitext(model_path)[1] != ".safetensors":
-        return {"info": f"Model is not in .safetensors format."}, None, "", "", "", "", 0, "", "", "", ""
+        return {"info": "Model is not in .safetensors format."}, None, "", "", "", "", 0, "", "", "", ""
 
       metadata = read_lora_metadata(model_path, module)
 
@@ -669,6 +729,7 @@ Requested path was: {f}
       return training_params, cover_image, display_name, author, keywords, description, rating, tags, model_hash, legacy_hash, model_path
 
     model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, author, keywords, description, rating, tags, model_hash, legacy_hash, model_path])
+    model.change(lambda: "", inputs=[], outputs=[copy_metadata_dir])
 
     def save_metadata(module, model, cover_image, display_name, author, keywords, description, rating, tags):
       if model == "None":
