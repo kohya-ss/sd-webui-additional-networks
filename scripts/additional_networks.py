@@ -604,14 +604,14 @@ Requested path was: {f}
 
     def refresh_metadata(module, model):
       if model == "None":
-        return {}, None, "", "", "", 0, "", "", "", ""
+        return {"info": "No model loaded."}, None, "", "", "", "", 0, "", "", "", ""
 
       model_path = lora_models.get(model, None)
       if model_path is None:
-        return {}, None, "", "", "", 0, "", "", "", ""
+        return {"info": f"Model path not found: {model}"}, None, "", "", "", "", 0, "", "", "", ""
 
       if os.path.splitext(model_path)[1] != ".safetensors":
-        return {}, None, "", "", "", 0, "", "", "", ""
+        return {"info": f"Model is not in .safetensors format."}, None, "", "", "", "", 0, "", "", "", ""
 
       metadata = read_lora_metadata(model_path, module)
 
