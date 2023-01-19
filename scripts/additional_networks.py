@@ -603,6 +603,8 @@ Requested path was: {f}
         with gr.Row():
           description = gr.Textbox(value="", label="Description", placeholder="Model description/readme/notes/instructions", lines=15, interactive=can_edit)
         with gr.Row():
+          source = gr.Textbox(value="", label="Source", placeholder="Source URL where this model could be found", interactive=can_edit)
+        with gr.Row():
           rating = gr.Slider(minimum=0, maximum=10, step=1, label="Rating", value=0)
           tags = gr.Textbox(value="", label="Tags", placeholder="Comma-separated list of tags (\"artist, style, landscape, 2d, 3d...\")", lines=2, interactive=can_edit)
         with gr.Row():
@@ -620,7 +622,7 @@ Requested path was: {f}
           except:
               pass
         with gr.Row():
-          metadata_view = gr.JSON(value="{}", label="Training parameters")
+          metadata_view = gr.JSON(value={}, label="Training parameters")
         with gr.Row(visible=False):
           info1 = gr.Textbox()
           info2 = gr.Textbox()
@@ -662,6 +664,7 @@ Requested path was: {f}
               "ssmd_display_name": "",
               "ssmd_keywords": "",
               "ssmd_author": "",
+              "ssmd_source": "",
               "ssmd_description": "",
               "ssmd_rating": "0",
               "ssmd_tags": "",
@@ -682,10 +685,10 @@ Requested path was: {f}
     copy_metadata_button.click(fn=copy_metadata_to_all, inputs=[module, model, copy_metadata_dir, copy_same_session], outputs=[save_output])
 
     def update_editing(enabled):
-      updates = [gr.Textbox.update(interactive=enabled)] * 5
+      updates = [gr.Textbox.update(interactive=enabled)] * 6
       updates.append(gr.Image.update(interactive=enabled))
       return updates
-    editing_enabled.change(fn=update_editing, inputs=[editing_enabled], outputs=[display_name, author, keywords, description, tags, cover_image])
+    editing_enabled.change(fn=update_editing, inputs=[editing_enabled], outputs=[display_name, author, source, keywords, description, tags, cover_image])
 
     cover_image.change(fn=modules.extras.run_pnginfo, inputs=[cover_image], outputs=[info1, img_file_info, info2])
 
@@ -696,14 +699,14 @@ Requested path was: {f}
 
     def refresh_metadata(module, model):
       if model == "None":
-        return {"info": "No model loaded."}, None, "", "", "", "", 0, "", "", "", ""
+        return {"info": "No model loaded."}, None, "", "", "", "", "", 0, "", "", "", ""
 
       model_path = lora_models.get(model, None)
       if model_path is None:
-        return {"info": f"Model path not found: {model}"}, None, "", "", "", "", 0, "", "", "", ""
+        return {"info": f"Model path not found: {model}"}, None, "", "", "", "", "", 0, "", "", "", ""
 
       if os.path.splitext(model_path)[1] != ".safetensors":
-        return {"info": "Model is not in .safetensors format."}, None, "", "", "", "", 0, "", "", "", ""
+        return {"info": "Model is not in .safetensors format."}, None, "", "", "", "", "", 0, "", "", "", ""
 
       metadata = read_lora_metadata(model_path, module)
 
@@ -719,6 +722,7 @@ Requested path was: {f}
         cover_image = decode_base64_to_pil(cover_images[0])
       display_name = metadata.get("ssmd_display_name", "")
       author = metadata.get("ssmd_author", "")
+      source = metadata.get("ssmd_source", "")
       keywords = metadata.get("ssmd_keywords", "")
       description = metadata.get("ssmd_description", "")
       rating = int(metadata.get("ssmd_rating", "0"))
@@ -726,12 +730,12 @@ Requested path was: {f}
       model_hash = metadata.get("sshs_model_hash", cache("hashes").get(model_path, {}).get("model", ""))
       legacy_hash = metadata.get("sshs_legacy_hash", cache("hashes").get(model_path, {}).get("legacy", ""))
 
-      return training_params, cover_image, display_name, author, keywords, description, rating, tags, model_hash, legacy_hash, model_path
+      return training_params, cover_image, display_name, author, source, keywords, description, rating, tags, model_hash, legacy_hash, model_path
 
-    model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, author, keywords, description, rating, tags, model_hash, legacy_hash, model_path])
+    model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, author, source, keywords, description, rating, tags, model_hash, legacy_hash, model_path])
     model.change(lambda: "", inputs=[], outputs=[copy_metadata_dir])
 
-    def save_metadata(module, model, cover_image, display_name, author, keywords, description, rating, tags):
+    def save_metadata(module, model, cover_image, display_name, author, source, keywords, description, rating, tags):
       if model == "None":
         return "No model selected.", "", ""
 
@@ -760,8 +764,9 @@ Requested path was: {f}
       updates = {
         "ssmd_cover_images": json.dumps(cover_images),
         "ssmd_display_name": display_name,
-        "ssmd_keywords": keywords,
         "ssmd_author": author,
+        "ssmd_source": source,
+        "ssmd_keywords": keywords,
         "ssmd_description": description,
         "ssmd_rating": rating,
         "ssmd_tags": tags,
@@ -772,7 +777,7 @@ Requested path was: {f}
       write_lora_metadata(model_path, module, updates)
       return "Model saved.", model_hash, legacy_hash
 
-    save_metadata_button.click(save_metadata, inputs=[module, model, cover_image, display_name, author, keywords, description, rating, tags], outputs=[save_output, model_hash, legacy_hash])
+    save_metadata_button.click(save_metadata, inputs=[module, model, cover_image, display_name, author, source, keywords, description, rating, tags], outputs=[save_output, model_hash, legacy_hash])
 
     def output_model_list(module, model, model_dir, sort_by):
         if model_dir == "":
