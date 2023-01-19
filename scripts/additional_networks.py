@@ -281,7 +281,7 @@ def on_ui_tabs():
               model_list = gr.Textbox(value="", label="Model list", placeholder="Model list will be output here")
 
       with gr.Column():
-        metadata_view = gr.JSON(value="test", label="Network metadata")
+        metadata_view = gr.JSON(value="{}", label="Network metadata")
 
     def update_metadata(module, model):
       if model == "None":
@@ -294,7 +294,7 @@ def on_ui_tabs():
       metadata = read_lora_metadata(model_path, module)
 
       if metadata is None:
-        return "No metadata found."
+        return '{"info":"No metadata found."}'
       else:
         return metadata
 
