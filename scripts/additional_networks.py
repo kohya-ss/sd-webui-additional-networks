@@ -33,6 +33,18 @@ from scripts import lora_compvis, safetensors_hack
 
 
 folder_symbol = '\U0001f4c2'  # 📂
+keycap_symbols = [
+  '\u0031\ufe0f\u20e3',  # 1️⃣
+  '\u0032\ufe0f\u20e3',  # 2️⃣
+  '\u0033\ufe0f\u20e3',  # 3️⃣
+  '\u0034\ufe0f\u20e3',  # 4️⃣
+  '\u0035\ufe0f\u20e3',  # 5️⃣
+  '\u0036\ufe0f\u20e3',  # 6️⃣
+  '\u0037\ufe0f\u20e3',  # 7️⃣
+  '\u0038\ufe0f\u20e3',  # 8️
+  '\u0039\ufe0f\u20e3',  # 9️
+  '\u1f51f'              # 🔟
+]
 
 
 # Metadata pertaining to LoRA training
@@ -86,6 +98,7 @@ lora_models = {}             # "My_Lora(abcd1234)" -> "C:/path/to/model.safetens
 lora_model_names = {}        # "my_lora" -> "My_Lora(abcd1234)"
 legacy_model_names = {}
 lora_models_dir = os.path.join(scripts.basedir(), "models/lora")
+addnet_paste_params = {"txt2img": [], "img2img": []}
 os.makedirs(lora_models_dir, exist_ok=True)
 
 
@@ -308,13 +321,22 @@ class Script(scripts.Script):
     return scripts.AlwaysVisible
 
   def ui(self, is_img2img):
+    global addnet_paste_params
     # NOTE: Changing the contents of `ctrls` means the XY Grid support may need
     # to be updated, see end of file
     ctrls = []
     model_dropdowns = []
+
+    tabname = "txt2img"
+    if is_img2img:
+      tabname = "img2img"
+
+    paste_params = addnet_paste_params[tabname]
+    paste_params.clear()
+
     self.infotext_fields = []
     with gr.Group():
-      with gr.Accordion('Additional Networks', open=False):
+      with gr.Accordion('Additional Networks', open=False, elem_id=f"additional_networks_{tabname}"):
         enabled = gr.Checkbox(label='Enable', value=False)
         ctrls.append(enabled)
         self.infotext_fields.append((enabled, "AddNet Enabled"))
@@ -327,6 +349,7 @@ class Script(scripts.Script):
                                 value="None")
 
             weight = gr.Slider(label=f"Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=.05)
+            paste_params.append({"module": module, "model": model})
           ctrls.extend((module, model, weight))
           model_dropdowns.append(model)
 
@@ -546,6 +569,15 @@ Requested path was: {f}
         with gr.Row():
           model_path = gr.Textbox("", label="Model path", interactive=False)
           open_folder_button = ToolButton(value=folder_symbol, elem_id="hidden_element" if shared.cmd_opts.hide_ui_dir_config else "open_folder_additional_networks")
+        for tabname in ["txt2img", "img2img"]:
+          with gr.Row():
+            with gr.Box():
+              with gr.Row():
+                gr.HTML(f"Send to {tabname}:")
+                for i in range(MAX_MODEL_COUNT):
+                  send_to_button = gr.Button(value=keycap_symbols[i], elem_id=f"additional_networks_send_to_{tabname}_{i}")
+                  send_to_button.click(fn=lambda *x: x, inputs=[module, model], outputs=[addnet_paste_params[tabname][i]["module"], addnet_paste_params[tabname][i]["model"]])
+                  send_to_button.click(fn=None,_js=f"addnet_switch_to_{tabname}", inputs=None, outputs=None)
 
         with gr.Row():
           with gr.Column():
