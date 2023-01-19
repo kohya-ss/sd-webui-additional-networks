@@ -4,6 +4,9 @@
 
 ## Updates / 更新情報
 
+- Jan 19 2023, 2023/1/19:
+  - Update to fix an error ``AttributeError: 'JSON' object has no attribute 'value'`` with the latest web UI. 
+  - 最新版の Web UI で発生する ``AttributeError: 'JSON' object has no attribute 'value'`` というエラーを解消しました。
 - Jan 16 2023, 2023/1/16:
   - Update to support X/Y plot in the latest web UI. 
   - If you cannot update the web UI, please download .zip file of the older version of this extension, from ``Releases``, and extract it to ``extensions`` folder.
