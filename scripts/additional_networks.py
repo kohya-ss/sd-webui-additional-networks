@@ -9,6 +9,8 @@ import inspect
 import base64
 import shutil
 import re
+import platform
+import subprocess as sp
 from collections import OrderedDict
 from multiprocessing.pool import ThreadPool as Pool
 import tqdm
@@ -23,10 +25,14 @@ import gradio as gr
 from modules.processing import Processed, process_images
 from modules import sd_models, hashes
 import modules.ui
+from modules.ui_components import ToolButton
 import modules.extras
 import modules.generation_parameters_copypaste as parameters_copypaste
 
 from scripts import lora_compvis, safetensors_hack
+
+
+folder_symbol = '\U0001f4c2'  # 📂
 
 
 # Metadata pertaining to LoRA training
@@ -206,8 +212,6 @@ def get_all_models(paths, sort_by, filter_by):
   elif sort_by == "path name":
     data = sorted(data)
   elif sort_by == "rating":
-    #def get_and_save_rating(x):
-    #  cache_hashes[x[0]]
     data = sorted(data, key=lambda x: get_model_rating(x["fileinfo"][0]), reverse=True)
 
   for result in data:
@@ -474,6 +478,7 @@ def write_lora_metadata(model_path, module, updates):
         metadata[k] = str(v)
 
       save_file(tensors, model_path, metadata)
+      print(f"[AddNet] Model saved: {model_path}")
 
 
 def decode_base64_to_pil(encoding):
@@ -501,6 +506,32 @@ def encode_pil_to_base64(image):
 
 
 def on_ui_tabs():
+  can_edit = False
+
+  def open_folder(f):
+    if not os.path.exists(f):
+      print(f'Folder "{f}" does not exist. After you create an image, the folder will be created.')
+      return
+    elif not os.path.isdir(f):
+      print(f"""
+WARNING
+An open_folder request was made with an argument that is not a folder.
+This could be an error or a malicious attempt to run code on your computer.
+Requested path was: {f}
+""", file=sys.stderr)
+      return
+
+    if not shared.cmd_opts.hide_ui_dir_config:
+      path = os.path.normpath(f)
+      if platform.system() == "Windows":
+        os.startfile(path)
+      elif platform.system() == "Darwin":
+        sp.Popen(["open", path])
+      elif "microsoft-standard-WSL2" in platform.uname().release:
+        sp.Popen(["wsl-open", path])
+      else:
+        sp.Popen(["xdg-open", path])
+
   with gr.Blocks(analytics_enabled=False) as additional_networks_interface:
     with gr.Row().style(equal_height=False):
       with gr.Column(variant='panel'):
@@ -512,6 +543,9 @@ def on_ui_tabs():
         with gr.Row():
           model_hash = gr.Textbox("", label="Model hash", interactive=False)
           legacy_hash = gr.Textbox("", label="Legacy hash", interactive=False)
+        with gr.Row():
+          model_path = gr.Textbox("", label="Model path", interactive=False)
+          open_folder_button = ToolButton(value=folder_symbol, elem_id="hidden_element" if shared.cmd_opts.hide_ui_dir_config else "open_folder_additional_networks")
 
         with gr.Row():
           with gr.Column():
@@ -524,21 +558,23 @@ def on_ui_tabs():
 
       with gr.Column():
         with gr.Row():
-          display_name = gr.Textbox(value="", label="Name", placeholder="Display name for this model")
-          author = gr.Textbox(value="", label="Author", placeholder="Author of this model")
+          display_name = gr.Textbox(value="", label="Name", placeholder="Display name for this model", interactive=can_edit)
+          author = gr.Textbox(value="", label="Author", placeholder="Author of this model", interactive=can_edit)
         with gr.Row():
-          keywords = gr.Textbox(value="", label="Keywords", placeholder="Activation keywords, comma-separated")
+          keywords = gr.Textbox(value="", label="Keywords", placeholder="Activation keywords, comma-separated", interactive=can_edit)
         with gr.Row():
-          description = gr.Textbox(value="", label="Description", placeholder="Model description/readme/notes/instructions", lines=15)
+          description = gr.Textbox(value="", label="Description", placeholder="Model description/readme/notes/instructions", lines=15, interactive=can_edit)
         with gr.Row():
           rating = gr.Slider(minimum=0, maximum=10, step=1, label="Rating", value=0)
-          tags = gr.Textbox(value="", label="Tags", placeholder="Comma-separated list of tags (\"artist, style, landscape, 2d, 3d...\")", lines=2)
+          tags = gr.Textbox(value="", label="Tags", placeholder="Comma-separated list of tags (\"artist, style, landscape, 2d, 3d...\")", lines=2, interactive=can_edit)
         with gr.Row():
+          editing_enabled = gr.Checkbox(label="Editing Enabled", value=can_edit)
           save_metadata_button = gr.Button("Save Metadata", variant="primary")
+        with gr.Row():
           save_output = gr.HTML("")
       with gr.Column():
         with gr.Row():
-          cover_image = gr.Image(label="Cover image", elem_id="additional_networks_cover_image", source="upload", interactive=True, type="pil", image_mode="RGBA").style(height=480)
+          cover_image = gr.Image(label="Cover image", elem_id="additional_networks_cover_image", source="upload", interactive=can_edit, type="pil", image_mode="RGBA").style(height=480)
         with gr.Row():
           try:
               send_to_buttons = parameters_copypaste.create_buttons(["txt2img", "img2img", "inpaint", "extras"])
@@ -551,6 +587,14 @@ def on_ui_tabs():
           info2 = gr.Textbox()
           img_file_info = gr.Textbox(label="Generate Info", interactive=False, lines=6)
 
+    open_folder_button.click(fn=lambda p: open_folder(os.path.dirname(p)), inputs=[model_path], outputs=[])
+
+    def update_editing(enabled):
+      updates = [gr.Textbox.update(interactive=enabled)] * 5
+      updates.append(gr.Image.update(interactive=enabled))
+      return updates
+    editing_enabled.change(fn=update_editing, inputs=[editing_enabled], outputs=[display_name, author, keywords, description, tags, cover_image])
+
     cover_image.change(fn=modules.extras.run_pnginfo, inputs=[cover_image], outputs=[info1, img_file_info, info2])
 
     try:
@@ -560,14 +604,14 @@ def on_ui_tabs():
 
     def refresh_metadata(module, model):
       if model == "None":
-        return {}, None, "", "", "", 0, "", "", ""
+        return {}, None, "", "", "", 0, "", "", "", ""
 
       model_path = lora_models.get(model, None)
       if model_path is None:
-        return {}, None, "", "", "", 0, "", "", ""
+        return {}, None, "", "", "", 0, "", "", "", ""
 
       if os.path.splitext(model_path)[1] != ".safetensors":
-        return {}, None, "", "", "", 0, "", "", ""
+        return {}, None, "", "", "", 0, "", "", "", ""
 
       metadata = read_lora_metadata(model_path, module)
 
@@ -590,9 +634,9 @@ def on_ui_tabs():
       model_hash = metadata.get("sshs_model_hash", cache("hashes").get(model_path, {}).get("model", ""))
       legacy_hash = metadata.get("sshs_legacy_hash", cache("hashes").get(model_path, {}).get("legacy", ""))
 
-      return training_params, cover_image, display_name, author, keywords, description, rating, tags, model_hash, legacy_hash
+      return training_params, cover_image, display_name, author, keywords, description, rating, tags, model_hash, legacy_hash, model_path
 
-    model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, author, keywords, description, rating, tags, model_hash, legacy_hash])
+    model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, author, keywords, description, rating, tags, model_hash, legacy_hash, model_path])
 
     def save_metadata(module, model, cover_image, display_name, author, keywords, description, rating, tags):
       if model == "None":
@@ -633,7 +677,7 @@ def on_ui_tabs():
       }
 
       write_lora_metadata(model_path, module, updates)
-      return "Saved.", model_hash, legacy_hash
+      return "Model saved.", model_hash, legacy_hash
 
     save_metadata_button.click(save_metadata, inputs=[module, model, cover_image, display_name, author, keywords, description, rating, tags], outputs=[save_output, model_hash, legacy_hash])
 
