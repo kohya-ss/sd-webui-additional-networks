@@ -24,9 +24,11 @@ class LoRAModule(torch.nn.Module):
   replaces forward method of the original Linear, instead of replacing the original Linear module.
   """
 
-  def __init__(self, lora_name, org_module: torch.nn.Module, multiplier=1.0, lora_dim=4):
+  def __init__(self, lora_name, org_module: torch.nn.Module, multiplier=1.0, lora_dim=4, alpha=1):
+    """ if alpha == 0 or None, alpha is rank (no scaling). """
     super().__init__()
     self.lora_name = lora_name
+    self.lora_dim = lora_dim
 
     if org_module.__class__.__name__ == 'Conv2d':
       in_dim = org_module.in_channels
@@ -38,6 +40,12 @@ class LoRAModule(torch.nn.Module):
       out_dim = org_module.out_features
       self.lora_down = torch.nn.Linear(in_dim, lora_dim, bias=False)
       self.lora_up = torch.nn.Linear(lora_dim, out_dim, bias=False)
+
+    if type(alpha) == torch.Tensor:
+      alpha = alpha.detach().numpy()
+    alpha = lora_dim if alpha is None or alpha == 0 else alpha
+    self.scale = alpha / self.lora_dim
+    self.register_buffer('alpha', torch.tensor(alpha))                    # 定数として扱える
 
     # same as microsoft's
     torch.nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
@@ -56,7 +64,7 @@ class LoRAModule(torch.nn.Module):
     """
     may be cascaded.
     """
-    return self.org_forward(x) + self.lora_up(self.lora_down(x)) * self.multiplier
+    return self.org_forward(x) + self.lora_up(self.lora_down(x)) * self.multiplier * self.scale
 
 
 def create_network_and_apply_compvis(du_state_dict, multiplier, text_encoder, unet, **kwargs):
@@ -68,16 +76,43 @@ def create_network_and_apply_compvis(du_state_dict, multiplier, text_encoder, un
       dtype = param.dtype
       break
 
-  # get dims from state dict
-  size = du_state_dict[list(du_state_dict.keys())[0]].size()          # if conv2d size is like [320,4,1,1]
-  network_dim = min([s for s in size if s > 1])
-  print(f"dimension: {network_dim}, multiplier: {multiplier}")
+  # get dims (rank) and alpha from state dict
+  # currently it is assumed all LoRA have same alpha. alpha may be different in future.
+  network_alpha = None
+  network_dim = None
+  for key, value in du_state_dict.items():
+    if network_alpha is None and 'alpha' in key:
+      network_alpha = value
+    if network_dim is None and 'lora_down' in key and len(value.size()) == 2:
+      network_dim = value.size()[0]
+    if network_alpha is not None and network_dim is not None:
+      break
+  if network_alpha is None:
+    network_alpha = network_dim
+
+  print(f"dimension: {network_dim}, alpha: {network_alpha}, multiplier: {multiplier}")
 
   # create, apply and load weights
-  network = LoRANetworkCompvis(text_encoder, unet, multiplier=multiplier, lora_dim=network_dim)
+  network = LoRANetworkCompvis(text_encoder, unet, multiplier=multiplier, lora_dim=network_dim, alpha=network_alpha)
   state_dict = network.apply_lora_modules(du_state_dict)              # some weights are applied to text encoder
   network.to(dtype)                                              # with this, if error comes from next line, the model will be used
   info = network.load_state_dict(state_dict, strict=False)
+
+  # remove redundant warnings
+  if len(info.missing_keys) > 4:
+    missing_keys = []
+    alpha_count = 0
+    for key in info.missing_keys:
+      if 'alpha' not in key:
+        missing_keys.append(key)
+      else:
+        if alpha_count == 0:
+          missing_keys.append(key)
+        alpha_count += 1
+    if alpha_count > 1:
+      missing_keys.append(f"... and {alpha_count-1} alphas")
+
+    info = torch.nn.modules.module._IncompatibleKeys(missing_keys, info.unexpected_keys)
 
   return network, info
 
@@ -156,10 +191,11 @@ class LoRANetworkCompvis(torch.nn.Module):
 
     return new_sd
 
-  def __init__(self, text_encoder, unet, multiplier=1.0, lora_dim=4) -> None:
+  def __init__(self, text_encoder, unet, multiplier=1.0, lora_dim=4, alpha=1) -> None:
     super().__init__()
     self.multiplier = multiplier
     self.lora_dim = lora_dim
+    self.alpha = alpha
 
     # create module instances
     self.v2 = False
@@ -175,7 +211,7 @@ class LoRANetworkCompvis(torch.nn.Module):
               lora_name = lora_name.replace('.', '_')
               if '_resblocks_23_' in lora_name:                           # ignore last block in StabilityAi Text Encoder
                 break
-              lora = LoRAModule(lora_name, child_module, self.multiplier, self.lora_dim)
+              lora = LoRAModule(lora_name, child_module, self.multiplier, self.lora_dim, self.alpha)
               loras.append(lora)
 
               replaced_modules.append(child_module)
