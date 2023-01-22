@@ -4,14 +4,19 @@
 
 ## Updates / 更新情報
 
-- Jan 19 2023, 2023/1/19:
-  - Update to fix an error ``AttributeError: 'JSON' object has no attribute 'value'`` with the latest web UI. 
-  - 最新版の Web UI で発生する ``AttributeError: 'JSON' object has no attribute 'value'`` というエラーを解消しました。
-- Jan 16 2023, 2023/1/16:
-  - Update to support X/Y plot in the latest web UI. 
-  - If you cannot update the web UI, please download .zip file of the older version of this extension, from ``Releases``, and extract it to ``extensions`` folder.
-  - 最新版の Web UI のX/Y plotで動作するよう更新しました。
-  - Web UI を最新版に更新できない場合は、``Releases`` のところから過去のバージョンの zip ファイルをダウンロードし、``extensions`` フォルダへ展開してください。
+__Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``.__ Thank you for great work!!!
+
+Note: Currently the models trained by the scripts 0.4.0 and the models for SD 2.x does not seem to be supported. 
+
+- Jan 22 2023, 2023/1/22:
+  - Add support for ``sd-scripts`` release 0.4.0. 
+    - ``alpha`` value for weights scaling is supported.
+    - The models trained by the scripts before 0.4.0 are also supported.
+  - Add new metadata.
+  - ``sd-scripts`` のバージョン0.4.0に対応しました。
+    - 重みを加減する ``alpha`` 値に対応しました。
+    - 以前のバージョンで作成したモデルも引き続きサポートされます。
+  - いくつかの新しいメタデータを追加しました。
 
 ## About
 
