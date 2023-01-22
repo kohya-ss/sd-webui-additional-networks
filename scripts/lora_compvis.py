@@ -42,7 +42,7 @@ class LoRAModule(torch.nn.Module):
       self.lora_up = torch.nn.Linear(lora_dim, out_dim, bias=False)
 
     if type(alpha) == torch.Tensor:
-      alpha = alpha.detach().numpy()
+      alpha = alpha.detach().float().numpy()                              # without casting, bf16 causes error
     alpha = lora_dim if alpha is None or alpha == 0 else alpha
     self.scale = alpha / self.lora_dim
     self.register_buffer('alpha', torch.tensor(alpha))                    # 定数として扱える
@@ -91,6 +91,10 @@ def create_network_and_apply_compvis(du_state_dict, multiplier, text_encoder, un
     network_alpha = network_dim
 
   print(f"dimension: {network_dim}, alpha: {network_alpha}, multiplier: {multiplier}")
+  if network_dim is None:
+    print(f"The selected model is not LoRA or not trained by `sd-scripts`?")
+    network_dim = 4
+    network_alpha = 1
 
   # create, apply and load weights
   network = LoRANetworkCompvis(text_encoder, unet, multiplier=multiplier, lora_dim=network_dim, alpha=network_alpha)
@@ -110,7 +114,8 @@ def create_network_and_apply_compvis(du_state_dict, multiplier, text_encoder, un
           missing_keys.append(key)
         alpha_count += 1
     if alpha_count > 1:
-      missing_keys.append(f"... and {alpha_count-1} alphas")
+      missing_keys.append(
+          f"... and {alpha_count-1} alphas. The model doesn't have alpha, use dim (rannk) as alpha. You can ignore this message.")
 
     info = torch.nn.modules.module._IncompatibleKeys(missing_keys, info.unexpected_keys)
 
