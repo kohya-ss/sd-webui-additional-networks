@@ -6,7 +6,7 @@
 
 __Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``.__ Thank you for great work!!!
 
-Note: Currently the models trained by the scripts 0.4.0 and the models for SD 2.x does not seem to be supported. 
+Note: Currently the models trained by the scripts 0.4.0 and the models for SD 2.x does not seem to be supported in Web UI.
 
 - Jan 22 2023, 2023/1/22:
   - Add support for ``sd-scripts`` release 0.4.0. 
