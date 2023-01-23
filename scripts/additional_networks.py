@@ -20,7 +20,7 @@ import modules.ui
 from scripts import lora_compvis
 
 
-LORA_METADATA_NAMES = {
+LORA_TRAIN_METADATA_NAMES = {
     "ss_session_id": "Session ID",
     "ss_training_started_at": "Training started at",
     "ss_output_name": "Output name",
