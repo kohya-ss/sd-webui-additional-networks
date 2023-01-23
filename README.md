@@ -8,7 +8,11 @@ __Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``.__
 
 Note: Currently the models trained by the scripts 0.4.0 and the models for SD 2.x does not seem to be supported in Web UI.
 
-- Jan 22 2023, 2023/1/23:
+- Jan 24 2023, 2023/1/24:
+  - Fix the LoRA model trained with ``sd-scripts`` 0.4.0 for SD2.x is not working.
+  - ``sd-scripts`` の0.4.0以降で学習されたSD2.x用のLoRAが正しく動作しない不具合を修正しました。
+``.safetensors`` をお使いください。
+- Jan 23 2023, 2023/1/23:
   - Fix an error with a model saved with ``bf16`` in .pt or .ckpt format.
      - If you use ``bf16`` with .pt/.ckpt, it seems to be required to disable safe-unpickle temporarily with ``--disable-safe-unpickle`` option for web UI. Please use ``.safetensors`` format for ``bf16``.
   - ``bf16`` で保存された.ptまたは.ckptのモデルが読み込めない不具合を修正しました。
