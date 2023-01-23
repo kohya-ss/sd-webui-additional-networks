@@ -4,19 +4,24 @@
 
 ## Updates / 更新情報
 
-- Jan 16 2023, 2023/1/16:
-  - Fix the issue about the directory name for models.
-  - Linuxでのモデル保存先ディレクトリの互換性問題を修正しました。
-- Jan 15 2023, 2023/1/15:
-  - Fix that other extensions and X/Y plot are sometimes shown/run twice.
-  - 他の拡張やX/Y plotが重複して表示・実行される不具合を修正しました。
-- Jan 14 2023, 2023/1/14:
-  - [X/Y plot is supported](#xy-plot). Thanks to space-nuko for this great contribution! 
-  - The metadata for the model can be inspected from ``Additional Networks`` tab.
-  - Please update the web UI to the latest version to work the extension.
-  - [X/Y plotに対応しました](#xy-plot-1)。素晴らしいプルリクをいただいた space-nuko 氏に改めて感謝します。
-  - モデルのメタデータが  ``Additional Networks`` から確認できるようになりました。
-  - 拡張が正しく動作しない場合、Web UI を最新版に更新してください。
+__Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``.__ Thank you for great work!!!
+
+Note: Currently the models trained by the scripts 0.4.0 and the models for SD 2.x does not seem to be supported in Web UI.
+
+- Jan 22 2023, 2023/1/23:
+  - Fix an error with a model saved with ``bf16`` in .pt or .ckpt format.
+     - If you use ``bf16`` with .pt/.ckpt, it seems to be required to disable safe-unpickle temporarily with ``--disable-safe-unpickle`` option for web UI. Please use ``.safetensors`` format for ``bf16``.
+  - ``bf16`` で保存された.ptまたは.ckptのモデルが読み込めない不具合を修正しました。
+     - これらのモデルをweb UIで読み込むには、``--disable-safe-unpickle`` で一時的にweb UIの safe-unpickle を無効にする必要があるようです。``bf16`` での保存には ``.safetensors`` をお使いください。
+- Jan 22 2023, 2023/1/22:
+  - Add support for ``sd-scripts`` release 0.4.0. 
+    - ``alpha`` value for weights scaling is supported.
+    - The models trained by the scripts before 0.4.0 are also supported.
+  - Add new metadata.
+  - ``sd-scripts`` のバージョン0.4.0に対応しました。
+    - 重みを加減する ``alpha`` 値に対応しました。
+    - 以前のバージョンで作成したモデルも引き続きサポートされます。
+  - いくつかの新しいメタデータを追加しました。
 
 ## About
 

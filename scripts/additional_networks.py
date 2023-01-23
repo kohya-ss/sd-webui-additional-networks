@@ -20,7 +20,10 @@ import modules.ui
 from scripts import lora_compvis
 
 
-LORA_TRAIN_METADATA_NAMES = {
+LORA_METADATA_NAMES = {
+    "ss_session_id": "Session ID",
+    "ss_training_started_at": "Training started at",
+    "ss_output_name": "Output name",
     "ss_learning_rate": "Learning rate",
     "ss_text_encoder_lr": "Text encoder LR",
     "ss_unet_lr": "UNet LR",
@@ -30,12 +33,14 @@ LORA_TRAIN_METADATA_NAMES = {
     "ss_num_epochs": "Total epochs",
     "ss_batch_size_per_device": "Batch size/device",
     "ss_total_batch_size": "Total batch size",
+    "ss_gradient_checkpointing": "Gradient checkpointing",
     "ss_gradient_accumulation_steps": "Gradient accum. steps",
     "ss_max_train_steps": "Max train steps",
     "ss_lr_warmup_steps": "LR warmup steps",
     "ss_lr_scheduler": "LR scheduler",
     "ss_network_module": "Network module",
     "ss_network_dim": "Network dim",
+    "ss_network_alpha": "Network alpha",
     "ss_mixed_precision": "Mixed precision",
     "ss_full_fp16": "Full FP16",
     "ss_v2": "V2",
@@ -51,15 +56,19 @@ LORA_TRAIN_METADATA_NAMES = {
     "ss_min_bucket_reso": "Min bucket reso.",
     "ss_max_bucket_reso": "Max bucket reso.",
     "ss_seed": "Seed",
+    "ss_keep_tokens": "Keep tokens",
+    "ss_dataset_dirs": "Dataset dirs.",
+    "ss_reg_dataset_dirs": "Reg dataset dirs.",
     "ss_sd_model_name": "SD model name",
-    "ss_vae_name": "VAE name"
+    "ss_vae_name": "VAE name",
+    "ss_training_comment": "Comment"
 }
 
 
 MAX_MODEL_COUNT = 5
 LORA_MODEL_EXTS = [".pt", ".ckpt", ".safetensors"]
 lora_models = {}      # "My_Lora(abcd1234)" -> C:/path/to/model.safetensors
-lora_model_names = {} # "my_lora" -> "My_Lora(abcd1234)"
+lora_model_names = {}  # "my_lora" -> "My_Lora(abcd1234)"
 lora_models_dir = os.path.join(scripts.basedir(), "models/lora")
 axis_params = [{}] * MAX_MODEL_COUNT
 os.makedirs(lora_models_dir, exist_ok=True)
@@ -184,18 +193,18 @@ def get_all_models(sort_by, filter_by, path):
 
 
 def find_closest_lora_model_name(search: str):
-    if not search:
-        return None
-    if search in lora_models:
-        return search
-    search = search.lower()
-    if search in lora_model_names:
-        return lora_model_names.get(search)
-    applicable = [name for name in lora_model_names.keys() if search in name.lower()]
-    if not applicable:
-        return None
-    applicable = sorted(applicable, key=lambda name: len(name))
-    return lora_model_names[applicable[0]]
+  if not search:
+    return None
+  if search in lora_models:
+    return search
+  search = search.lower()
+  if search in lora_model_names:
+    return lora_model_names.get(search)
+  applicable = [name for name in lora_model_names.keys() if search in name.lower()]
+  if not applicable:
+    return None
+  applicable = sorted(applicable, key=lambda name: len(name))
+  return lora_model_names[applicable[0]]
 
 
 def update_lora_models():
@@ -213,10 +222,10 @@ def update_lora_models():
   lora_models = OrderedDict(**{"None": None}, **res)
   lora_model_names = {}
   for name_and_hash, filename in lora_models.items():
-      if filename == None:
-          continue
-      name = os.path.splitext(os.path.basename(filename))[0].lower()
-      lora_model_names[name] = name_and_hash
+    if filename == None:
+      continue
+    name = os.path.splitext(os.path.basename(filename))[0].lower()
+    lora_model_names[name] = name_and_hash
 
 
 update_lora_models()
@@ -375,7 +384,8 @@ class Script(scripts.Script):
             du_state_dict = torch.load(model_path, map_location='cpu')
 
           network, info = lora_compvis.create_network_and_apply_compvis(du_state_dict, weight, text_encoder, unet)
-          network.to(p.sd_model.device, dtype=p.sd_model.dtype)         # in medvram, device is different for u-net and sd_model, so use sd_model's
+          # in medvram, device is different for u-net and sd_model, so use sd_model's
+          network.to(p.sd_model.device, dtype=p.sd_model.dtype)
 
           print(f"LoRA model {model} loaded: {info}")
           self.latest_networks.append((network, model))
@@ -408,10 +418,11 @@ def on_ui_tabs():
         with gr.Row():
           module = gr.Dropdown(["LoRA"], label=f"Network module (used throughout this tab)", value="LoRA", interactive=True)
           model = gr.Dropdown(list(lora_models.keys()), label=f"Model", value="None", interactive=True)
-          modules.ui.create_refresh_button(model, update_lora_models, lambda: {"choices": list(lora_models.keys())}, "refresh_lora_models")
+          modules.ui.create_refresh_button(model, update_lora_models, lambda: {
+                                           "choices": list(lora_models.keys())}, "refresh_lora_models")
 
       with gr.Column():
-        metadata_view = gr.JSON(value="test", label="Network metadata")
+        metadata_view = gr.JSON(value="{}", label="Network metadata")
 
     def update_metadata(module, model):
       if model == "None":
@@ -424,7 +435,7 @@ def on_ui_tabs():
       metadata = read_lora_metadata(model_path, module)
 
       if metadata is None:
-        return "No metadata found."
+        return '{"info":"No metadata found."}'
       else:
         return metadata
 
@@ -434,21 +445,24 @@ def on_ui_tabs():
 
 
 def on_ui_settings():
-    section = ('additional_networks', "Additional Networks")
-    shared.opts.add_option("additional_networks_extra_lora_path", shared.OptionInfo("", "Extra path to scan for LoRA models (e.g. training output directory)", section=section))
-    shared.opts.add_option("additional_networks_sort_models_by", shared.OptionInfo("name", "Sort LoRA models by", gr.Radio, {"choices": ["name", "date", "path name"]}, section=section))
-    shared.opts.add_option("additional_networks_model_name_filter", shared.OptionInfo("", "LoRA model name filter", section=section))
-    shared.opts.add_option("additional_networks_xy_grid_model_metadata", shared.OptionInfo("", "Metadata to show in XY-Grid label for Model axes, comma-separated (example: \"ss_learning_rate, ss_num_epochs\")", section=section))
+  section = ('additional_networks', "Additional Networks")
+  shared.opts.add_option("additional_networks_extra_lora_path", shared.OptionInfo(
+      "", "Extra path to scan for LoRA models (e.g. training output directory)", section=section))
+  shared.opts.add_option("additional_networks_sort_models_by", shared.OptionInfo(
+      "name", "Sort LoRA models by", gr.Radio, {"choices": ["name", "date", "path name"]}, section=section))
+  shared.opts.add_option("additional_networks_model_name_filter", shared.OptionInfo("", "LoRA model name filter", section=section))
+  shared.opts.add_option("additional_networks_xy_grid_model_metadata", shared.OptionInfo(
+      "", "Metadata to show in XY-Grid label for Model axes, comma-separated (example: \"ss_learning_rate, ss_num_epochs\")", section=section))
 
 
 def on_infotext_pasted(infotext, params):
-    for i in range(MAX_MODEL_COUNT):
-        if f"AddNet Module {i+1}" not in params:
-            params[f"AddNet Module {i+1}"] = "LoRA"
-        if f"AddNet Model {i+1}" not in params:
-            params[f"AddNet Model {i+1}"] = "None"
-        if f"AddNet Weight {i+1}" not in params:
-            params[f"AddNet Weight {i+1}"] = "0"
+  for i in range(MAX_MODEL_COUNT):
+    if f"AddNet Module {i+1}" not in params:
+      params[f"AddNet Module {i+1}"] = "LoRA"
+    if f"AddNet Model {i+1}" not in params:
+      params[f"AddNet Model {i+1}"] = "None"
+    if f"AddNet Weight {i+1}" not in params:
+      params[f"AddNet Weight {i+1}"] = "0"
 
 
 script_callbacks.on_ui_tabs(on_ui_tabs)
