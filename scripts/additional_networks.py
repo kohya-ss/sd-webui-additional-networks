@@ -20,12 +20,142 @@ import modules.ui
 from scripts import lora_compvis
 
 
+LORA_METADATA_NAMES = {
+    "ss_session_id": "Session ID",
+    "ss_training_started_at": "Training started at",
+    "ss_output_name": "Output name",
+    "ss_learning_rate": "Learning rate",
+    "ss_text_encoder_lr": "Text encoder LR",
+    "ss_unet_lr": "UNet LR",
+    "ss_num_train_images": "# of training images",
+    "ss_num_reg_images": "# of reg images",
+    "ss_num_batches_per_epoch": "Batches per epoch",
+    "ss_num_epochs": "Total epochs",
+    "ss_batch_size_per_device": "Batch size/device",
+    "ss_total_batch_size": "Total batch size",
+    "ss_gradient_checkpointing": "Gradient checkpointing",
+    "ss_gradient_accumulation_steps": "Gradient accum. steps",
+    "ss_max_train_steps": "Max train steps",
+    "ss_lr_warmup_steps": "LR warmup steps",
+    "ss_lr_scheduler": "LR scheduler",
+    "ss_network_module": "Network module",
+    "ss_network_dim": "Network dim",
+    "ss_network_alpha": "Network alpha",
+    "ss_mixed_precision": "Mixed precision",
+    "ss_full_fp16": "Full FP16",
+    "ss_v2": "V2",
+    "ss_resolution": "Resolution",
+    "ss_clip_skip": "Clip skip",
+    "ss_max_token_length": "Max token length",
+    "ss_color_aug": "Color aug",
+    "ss_flip_aug": "Flip aug",
+    "ss_random_crop": "Random crop",
+    "ss_shuffle_caption": "Shuffle caption",
+    "ss_cache_latents": "Cache latents",
+    "ss_enable_bucket": "Enable bucket",
+    "ss_min_bucket_reso": "Min bucket reso.",
+    "ss_max_bucket_reso": "Max bucket reso.",
+    "ss_seed": "Seed",
+    "ss_keep_tokens": "Keep tokens",
+    "ss_dataset_dirs": "Dataset dirs.",
+    "ss_reg_dataset_dirs": "Reg dataset dirs.",
+    "ss_sd_model_name": "SD model name",
+    "ss_vae_name": "VAE name",
+    "ss_training_comment": "Comment"
+}
+
+
 MAX_MODEL_COUNT = 5
 LORA_MODEL_EXTS = [".pt", ".ckpt", ".safetensors"]
 lora_models = {}      # "My_Lora(abcd1234)" -> C:/path/to/model.safetensors
 lora_model_names = {}  # "my_lora" -> "My_Lora(abcd1234)"
 lora_models_dir = os.path.join(scripts.basedir(), "models/lora")
+axis_params = [{}] * MAX_MODEL_COUNT
 os.makedirs(lora_models_dir, exist_ok=True)
+
+
+def update_axis_params(i, module, model):
+  axis_params[i] = {"module": module, "model": model}
+
+
+def get_axis_model_choices(i):
+  module = axis_params[i].get("module", "None")
+  model = axis_params[i].get("model", "None")
+
+  if module == "LoRA":
+    if model != "None":
+      sort_by = shared.opts.data.get("additional_networks_sort_models_by", "name")
+      return get_model_list(module, model, "", sort_by)
+
+  return []
+
+
+def update_script_args(p, value, arg_idx):
+    for s in scripts.scripts_txt2img.alwayson_scripts:
+        if isinstance(s, Script):
+            args = list(p.script_args)
+            # print(f"Changed arg {arg_idx} from {args[s.args_from + arg_idx - 1]} to {value}")
+            args[s.args_from + arg_idx] = value
+            p.script_args = tuple(args)
+            break
+
+
+def confirm_models(p, xs):
+    for x in xs:
+        if x in ["", "None"]:
+            continue
+        if not find_closest_lora_model_name(x):
+            raise RuntimeError(f"Unknown LoRA model: {x}")
+
+
+def apply_module(p, x, xs, i):
+    update_script_args(p, True, 0)      # set Enabled to True
+    update_script_args(p, x, 1 + 3 * i) # enabled, ({module}, model, weight), ...
+
+
+def apply_model(p, x, xs, i):
+    name = find_closest_lora_model_name(x)
+    update_script_args(p, True, 0)
+    update_script_args(p, name, 2 + 3 * i) # enabled, (module, {model}, weight), ...
+
+
+def apply_weight(p, x, xs, i):
+    update_script_args(p, True, 0)
+    update_script_args(p, x, 3 + 3 * i) # enabled, (module, model, {weight), ...
+
+
+def format_lora_model(p, opt, x):
+    model = find_closest_lora_model_name(x)
+    if model is None or model.lower() in ["", "none"]:
+        return "None"
+
+    value = xy_grid.format_value(p, opt, model)
+
+    model_path = lora_models.get(model)
+    metadata = read_lora_metadata(model_path, "LoRA")
+    if not metadata:
+        return value
+
+    metadata_names = shared.opts.data.get("additional_networks_xy_grid_model_metadata", "").split(",")
+    if not metadata_names:
+        return value
+
+    for name in metadata_names:
+        name = name.strip()
+        if name in metadata:
+            formatted_name = LORA_TRAIN_METADATA_NAMES.get(name, name)
+            value += f"\n{formatted_name}: {metadata[name]}, "
+
+    return value.strip(" ").strip(",")
+
+
+for scriptDataTuple in scripts.scripts_data:
+    if os.path.basename(scriptDataTuple.path) == "xy_grid.py":
+        xy_grid = scriptDataTuple.module
+        for i in range(MAX_MODEL_COUNT):
+           model = xy_grid.AxisOption(f"AddNet Model {i+1}", str, lambda p, x, xs, i=i: apply_model(p, x, xs, i), format_lora_model, confirm_models, cost=0.5, choices=lambda i=i: get_axis_model_choices(i))
+           weight = xy_grid.AxisOption(f"AddNet Weight {i+1}", float, lambda p, x, xs, i=i: apply_weight(p, x, xs, i), xy_grid.format_value_add_label, None, cost=0)
+           xy_grid.axis_options.extend([model, weight])
 
 
 def traverse_all_files(curr_path, model_list):
@@ -101,6 +231,21 @@ def update_lora_models():
 update_lora_models()
 
 
+def get_model_list(module, model, model_dir, sort_by):
+    if model_dir == "":
+        # Get list of models with same folder as this one
+        model_path = lora_models.get(model, None)
+        if model_path is None:
+            return f"file not found: {model_path}"
+        model_dir = os.path.dirname(model_path)
+
+    if not os.path.isdir(model_dir):
+        return f"directory not found: {model_dir}"
+
+    found = get_all_models(sort_by, "", model_dir)
+    return found.keys()
+
+
 class Script(scripts.Script):
   def __init__(self) -> None:
     super().__init__()
@@ -132,6 +277,9 @@ class Script(scripts.Script):
             model = gr.Dropdown(list(lora_models.keys()),
                                 label=f"Model {i+1}",
                                 value="None")
+
+            module.change(lambda module, model, i=i: update_axis_params(i, module, model), inputs=[module, model], outputs=[])
+            model.change(lambda module, model, i=i: update_axis_params(i, module, model), inputs=[module, model], outputs=[])
 
             weight = gr.Slider(label=f"Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=.05)
           ctrls.extend((module, model, weight))
@@ -273,15 +421,6 @@ def on_ui_tabs():
           modules.ui.create_refresh_button(model, update_lora_models, lambda: {
                                            "choices": list(lora_models.keys())}, "refresh_lora_models")
 
-        with gr.Row():
-          with gr.Column():
-            gr.HTML(value="Get comma-separated list of models (for XY Grid)")
-            model_dir = gr.Textbox("", label=f"Model directory", placeholder="Optional, uses selected model's directory if blank")
-            model_sort_by = gr.Radio(label="Sort models by", choices=["name", "date", "path name"], value="name", type="value")
-            get_list_button = gr.Button("Get List")
-          with gr.Column():
-            model_list = gr.Textbox(value="", label="Model list", placeholder="Model list will be output here")
-
       with gr.Column():
         metadata_view = gr.JSON(value="{}", label="Network metadata")
 
@@ -302,138 +441,7 @@ def on_ui_tabs():
 
     model.change(update_metadata, inputs=[module, model], outputs=[metadata_view])
 
-    def output_model_list(module, model, model_dir, sort_by):
-      if model_dir == "":
-          # Get list of models with same folder as this one
-        model_path = lora_models.get(model, None)
-        if model_path is None:
-          return f"file not found: {model_path}"
-        model_dir = os.path.dirname(model_path)
-
-      if not os.path.isdir(model_dir):
-        return f"directory not found: {model_dir}"
-
-      found = get_all_models(sort_by, "", model_dir)
-      return ", ".join(found.keys())
-
-    get_list_button.click(output_model_list, inputs=[module, model, model_dir, model_sort_by], outputs=[model_list])
-
   return [(additional_networks_interface, "Additional Networks", "additional_networks")]
-
-
-def update_script_args(p, value, arg_idx):
-  for s in scripts.scripts_txt2img.alwayson_scripts:
-    if isinstance(s, Script):
-      args = list(p.script_args)
-      # print(f"Changed arg {arg_idx} from {args[s.args_from + arg_idx - 1]} to {value}")
-      args[s.args_from + arg_idx] = value
-      p.script_args = tuple(args)
-      break
-
-
-def confirm_models(p, xs):
-  for x in xs:
-    if x in ["", "None"]:
-      continue
-    if not find_closest_lora_model_name(x):
-      raise RuntimeError(f"Unknown LoRA model: {x}")
-
-
-def apply_module(p, x, xs, i):
-  update_script_args(p, True, 0)      # set Enabled to True
-  update_script_args(p, x, 1 + 3 * i)  # enabled, ({module}, model, weight), ...
-
-
-def apply_model(p, x, xs, i):
-  name = find_closest_lora_model_name(x)
-  update_script_args(p, True, 0)
-  update_script_args(p, name, 2 + 3 * i)  # enabled, (module, {model}, weight), ...
-
-
-def apply_weight(p, x, xs, i):
-  update_script_args(p, True, 0)
-  update_script_args(p, x, 3 + 3 * i)  # enabled, (module, model, {weight), ...
-
-
-LORA_METADATA_NAMES = {
-    "ss_session_id": "Session ID",
-    "ss_training_started_at": "Training started at",
-    "ss_output_name": "Output name",
-    "ss_learning_rate": "Learning rate",
-    "ss_text_encoder_lr": "Text encoder LR",
-    "ss_unet_lr": "UNet LR",
-    "ss_num_train_images": "# of training images",
-    "ss_num_reg_images": "# of reg images",
-    "ss_num_batches_per_epoch": "Batches per epoch",
-    "ss_num_epochs": "Total epochs",
-    "ss_batch_size_per_device": "Batch size/device",
-    "ss_total_batch_size": "Total batch size",
-    "ss_gradient_checkpointing": "Gradient checkpointing",
-    "ss_gradient_accumulation_steps": "Gradient accum. steps",
-    "ss_max_train_steps": "Max train steps",
-    "ss_lr_warmup_steps": "LR warmup steps",
-    "ss_lr_scheduler": "LR scheduler",
-    "ss_network_module": "Network module",
-    "ss_network_dim": "Network dim",
-    "ss_network_alpha": "Network alpha",
-    "ss_mixed_precision": "Mixed precision",
-    "ss_full_fp16": "Full FP16",
-    "ss_v2": "V2",
-    "ss_resolution": "Resolution",
-    "ss_clip_skip": "Clip skip",
-    "ss_max_token_length": "Max token length",
-    "ss_color_aug": "Color aug",
-    "ss_flip_aug": "Flip aug",
-    "ss_random_crop": "Random crop",
-    "ss_shuffle_caption": "Shuffle caption",
-    "ss_cache_latents": "Cache latents",
-    "ss_enable_bucket": "Enable bucket",
-    "ss_min_bucket_reso": "Min bucket reso.",
-    "ss_max_bucket_reso": "Max bucket reso.",
-    "ss_seed": "Seed",
-    "ss_keep_tokens": "Keep tokens",
-    "ss_dataset_dirs": "Dataset dirs.",
-    "ss_reg_dataset_dirs": "Reg dataset dirs.",
-    "ss_sd_model_name": "SD model name",
-    "ss_vae_name": "VAE name",
-    "ss_training_comment": "Comment"
-}
-
-
-def format_lora_model(p, opt, x):
-  model = find_closest_lora_model_name(x)
-  if model is None or model.lower() in ["", "none"]:
-    return "None"
-
-  value = xy_grid.format_value(p, opt, model)
-
-  model_path = lora_models.get(model)
-  metadata = read_lora_metadata(model_path, "LoRA")
-  if not metadata:
-    return value
-
-  metadata_names = shared.opts.data.get("additional_networks_xy_grid_model_metadata", "").split(",")
-  if not metadata_names:
-    return value
-
-  for name in metadata_names:
-    name = name.strip()
-    if name in metadata:
-      formatted_name = LORA_METADATA_NAMES.get(name, name)
-      value += f"\n{formatted_name}: {metadata[name]}, "
-
-  return value.strip(" ").strip(",")
-
-
-for scriptDataTuple in scripts.scripts_data:
-  if os.path.basename(scriptDataTuple.path) == "xy_grid.py":
-    xy_grid = scriptDataTuple.module
-    for i in range(MAX_MODEL_COUNT):
-      model = xy_grid.AxisOption(f"AddNet Model {i+1}", str, lambda p, x, xs,
-                                 i=i: apply_model(p, x, xs, i), format_lora_model, confirm_models, 0.5)
-      weight = xy_grid.AxisOption(f"AddNet Weight {i+1}", float, lambda p, x, xs,
-                                  i=i: apply_weight(p, x, xs, i), xy_grid.format_value_add_label, None, 0)
-      xy_grid.axis_options.extend([model, weight])
 
 
 def on_ui_settings():
