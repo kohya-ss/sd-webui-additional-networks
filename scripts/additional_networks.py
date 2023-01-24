@@ -91,7 +91,7 @@ def get_model_list(module, model, model_dir, sort_by):
     if not os.path.isdir(model_dir):
         return []
 
-    found = get_all_models(sort_by, "", model_dir)
+    found, _ = get_all_models([model_dir], sort_by, "")
     return found.keys()
 
 
