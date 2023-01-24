@@ -14,13 +14,13 @@ from modules import shared, script_callbacks
 import gradio as gr
 
 from modules.processing import Processed, process_images
-from modules import sd_models
+from modules import shared, sd_models
 import modules.ui
 
 from scripts import lora_compvis
 
 
-MAX_MODEL_COUNT = 5
+MAX_MODEL_COUNT = shared.cmd_opts.max_lora_count
 LORA_MODEL_EXTS = [".pt", ".ckpt", ".safetensors"]
 lora_models = {}      # "My_Lora(abcd1234)" -> C:/path/to/model.safetensors
 lora_model_names = {}  # "my_lora" -> "My_Lora(abcd1234)"
