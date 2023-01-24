@@ -552,9 +552,7 @@ def read_lora_metadata(model_path, module):
   metadata = None
   if module == "LoRA":
     if os.path.splitext(model_path)[1] == '.safetensors':
-      from safetensors.torch import safe_open
-      with safe_open(model_path, framework="pt") as f:
-        metadata = f.metadata()
+      metadata = safetensors_hack.read_metadata(model_path)
 
   return metadata
 
