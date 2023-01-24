@@ -334,21 +334,18 @@ def get_all_models(paths, sort_by, filter_by):
 
 
 def find_closest_lora_model_name(search: str):
-    print(f"SEARCH: {search}")
     if not search or search == "None":
         return None
 
     # Match name and hash, case-sensitive
     # "MyModel-epoch00002(abcdef123456)"
     if search in lora_models:
-        print(f"Found case-sensitive")
         return search
 
     # Match full name, case-insensitive
     # "mymodel-epoch00002"
     search = search.lower()
     if search in lora_model_names:
-        print(f"Found full name case-insensitive")
         return lora_model_names.get(search)
 
     # Match legacy hash (8 characters)
@@ -356,17 +353,14 @@ def find_closest_lora_model_name(search: str):
     result = re_legacy_hash.search(search)
     if result is not None:
         model_hash = result.group(1)
-        print(f"Legacy hash: {model_hash}")
         if model_hash in legacy_model_names:
             new_model_name = legacy_model_names[model_hash]
-            print(f"Found from legacy: {new_model_name}")
             return new_model_name
 
     # Use any model with the search term as the prefix, case-insensitive, sorted
     # by name length
     # "mymodel"
     applicable = [name for name in lora_model_names.keys() if search in name.lower()]
-    print(f"Search results: {applicable}")
     if not applicable:
         return None
     applicable = sorted(applicable, key=lambda name: len(name))
