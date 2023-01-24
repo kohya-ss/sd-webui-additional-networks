@@ -250,6 +250,14 @@ def get_model_rating(filename):
   return int(metadata.get("ssmd_rating", "0"))
 
 
+def has_user_metadata(filename):
+  if not is_safetensors(filename):
+    return False
+
+  metadata = safetensors_hack.read_metadata(filename)
+  return any(k.startswith("ssmd_") for k in metadata.keys())
+
+
 def hash_model_file(finfo):
   filename = finfo[0]
   stat = finfo[1]
@@ -303,6 +311,8 @@ def get_all_models(paths, sort_by, filter_by):
     data = sorted(data)
   elif sort_by == "rating":
     data = sorted(data, key=lambda x: get_model_rating(x["fileinfo"][0]), reverse=True)
+  elif sort_by == "has user metadata":
+    data = sorted(data, key=lambda x: os.path.basename(x["fileinfo"][0]) if has_user_metadata(x["fileinfo"][0]) else "", reverse=True)
 
   for result in data:
     finfo = result["fileinfo"]
@@ -593,7 +603,7 @@ def on_ui_settings():
   shared.opts.add_option("additional_networks_extra_lora_path", shared.OptionInfo(
       "", "Extra path to scan for LoRA models (e.g. training output directory)", section=section))
   shared.opts.add_option("additional_networks_sort_models_by", shared.OptionInfo(
-      "name", "Sort LoRA models by", gr.Radio, {"choices": ["name", "date", "path name"]}, section=section))
+      "name", "Sort LoRA models by", gr.Radio, {"choices": ["name", "date", "path name", "rating", "has user metadata"]}, section=section))
   shared.opts.add_option("additional_networks_model_name_filter", shared.OptionInfo("", "LoRA model name filter", section=section))
   shared.opts.add_option("additional_networks_xy_grid_model_metadata", shared.OptionInfo(
       "", "Metadata to show in XY-Grid label for Model axes, comma-separated (example: \"ss_learning_rate, ss_num_epochs\")", section=section))
