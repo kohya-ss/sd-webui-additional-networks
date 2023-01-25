@@ -9,6 +9,9 @@ import safetensors.torch
 
 from modules import sd_models
 
+# PyTorch 1.13 and later have _TypedStorage renamed to TypedStorage
+UntypedStorage = torch.storage.UntypedStorage if hasattr(torch.storage, 'UntypedStorage') else torch.storage._UntypedStorage
+
 def read_metadata(filename):
     """Reads the JSON metadata from a .safetensors file"""
     with open(filename, mode="r", encoding="utf8") as file_obj:
@@ -32,7 +35,7 @@ def load_file(filename, device):
             metadata = json.loads(metadata_bytes)
 
     size = os.stat(filename).st_size
-    storage = torch._UntypedStorage.from_file(filename, False, size)
+    storage = UntypedStorage.from_file(filename, False, size)
     offset = n + 8
     md = metadata.get("__metadata__", {})
     return {name: create_tensor(storage, info, offset) for name, info in metadata.items() if name != "__metadata__"}, md
