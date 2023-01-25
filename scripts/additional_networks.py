@@ -17,7 +17,7 @@ from modules import shared, script_callbacks
 import gradio as gr
 
 from modules.processing import Processed, process_images
-from modules import sd_models, hashes
+from modules import shared, sd_models, hashes
 import modules.ui
 
 from scripts import lora_compvis, safetensors_hack
@@ -69,7 +69,7 @@ LORA_TRAIN_METADATA_NAMES = {
 }
 
 
-MAX_MODEL_COUNT = 5
+MAX_MODEL_COUNT = shared.cmd_opts.max_lora_count
 LORA_MODEL_EXTS = [".pt", ".ckpt", ".safetensors"]
 re_legacy_hash = re.compile("\(([0-9a-f]{8})\)$") # matches 8-character hashes, new hash has 12 characters
 lora_models = {}       # "My_Lora(abcdef123456)" -> "C:/path/to/model.safetensors"
