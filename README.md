@@ -8,23 +8,24 @@ __Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``.__
 
 Note: Currently the models trained by the scripts 0.4.0 and the models for SD 2.x does not seem to be supported in Web UI.
 
-- Jan 24 2023, 2023/1/24:
-  - Fix the LoRA model trained with ``sd-scripts`` 0.4.0 for SD2.x is not working.
-  - ``sd-scripts`` の0.4.0以降で学習されたSD2.x用のLoRAが正しく動作しない不具合を修正しました。
-- Jan 23 2023, 2023/1/23:
-  - Fix an error with a model saved with ``bf16`` in .pt or .ckpt format.
-     - If you use ``bf16`` with .pt/.ckpt, it seems to be required to disable safe-unpickle temporarily with ``--disable-safe-unpickle`` option for web UI. Please use ``.safetensors`` format for ``bf16``.
-  - ``bf16`` で保存された.ptまたは.ckptのモデルが読み込めない不具合を修正しました。
-     - これらのモデルをweb UIで読み込むには、``--disable-safe-unpickle`` で一時的にweb UIの safe-unpickle を無効にする必要があるようです。``bf16`` での保存には ``.safetensors`` をお使いください。
-- Jan 22 2023, 2023/1/22:
-  - Add support for ``sd-scripts`` release 0.4.0. 
-    - ``alpha`` value for weights scaling is supported.
-    - The models trained by the scripts before 0.4.0 are also supported.
-  - Add new metadata.
-  - ``sd-scripts`` のバージョン0.4.0に対応しました。
-    - 重みを加減する ``alpha`` 値に対応しました。
-    - 以前のバージョンで作成したモデルも引き続きサポートされます。
-  - いくつかの新しいメタデータを追加しました。
+- 25 Jan. 2023, 2023/1/25
+  - Support the latest web UI X/Y/Z plot.
+  - Improve hashing algorithm to avoid unintended changes to model hash by updating metadata. Thanks to space-nuko!
+  - Now the list of models in X/Y/Z plot can be retrieved with the next button. Thanks to space-nuko!
+    - Please select any model in ``Model ?`` at ``Additional Networks`` in order to make the button work. Models in the same folder as the model will be listed.
+    - ``Swap axes`` buttons do not seem to swap the model listing button. Please do not use the swap axes buttons. This seems to be the web UI issue.
+  - __Experimenatal__ ``--addnet-max-model-count`` option is added to web UI to use more than 5 models in the same time. Thanks to Fannovel16!
+    - like ``webui.bat --addnet-max-model-count 8``
+  - Web UI最新版のX/Y/Z plotに対応しました。
+  - メタデータの更新によりモデルのハッシュ値が変わるのを避けるため、ハッシュ計算のアルゴリズムを更新しました。space-nuko氏に感謝します。
+  - X/Y/Z plotのモデルリストが、選択肢の隣にあるボタンで取得できるようになりました。 space-nuko氏に感謝します。
+    - いずれかのモデルを ``Additional Networks`` の ``Model ?`` で選択しておいてください。そのモデルと同じフォルダにあるモデルの一覧が取得されます。
+    - ``Swap axes`` ボタンはモデルリストボタンについて正しく動作しないようです。Web UIの問題のようです。Swap axesボタンを使用せず運用願います。
+  - __実験的オプション__ ``--addnet-max-model-count``オプションがWeb UIに追加されます。 5より多くの任意の数のLoRAモデル等を同時に指定できるようになります。Fannovel16氏に感謝します。
+    - ``webui.bat --addnet-max-model-count 8`` のように指定してください。
+
+Please read [Releases](https://github.com/kohya-ss/sd-webui-additional-networks/releases) for recent updates.
+最近の更新情報は [Release](https://github.com/kohya-ss/sd-webui-additional-networks/releases) をご覧ください。
 
 ## About
 
@@ -68,7 +69,7 @@ If you use LoRA models to plot, put the comma separated list of the model names 
 
 ![image](https://user-images.githubusercontent.com/52813779/212444037-8ccd9157-c341-4eb4-82b4-64e3c8ee0237.png)
 
-You can get the list in ``Additional Networks`` tab on top of the UI. Select some model from ``Model`` dropdown, and push ``Get List`` button. The model list can be copied for X/Y values.
+You can get the list of models with the button next to ``Values``. Please select any model in ``Model ?`` at ``Additional Networks`` in order to make the button work. Models in the same folder as the model will be listed.
 
 ![image](https://user-images.githubusercontent.com/52813779/212443639-97779d8d-0f7e-47f0-919c-41f053fe28a9.png)
 
@@ -118,7 +119,7 @@ LoRAモデルをX/Y plotの値（選択対象）として使う場合は、カ�
 
 ![image](https://user-images.githubusercontent.com/52813779/212444037-8ccd9157-c341-4eb4-82b4-64e3c8ee0237.png)
 
-モデルのリストはWeb UI上部の ``Additional Networks`` タブで取得できます。タブを開き、 ``Model`` ドロップダウンから適当なモデルを選択し、``Get List`` ボタンを押してください。モデルのリストが表示されます。リストはコピーしてX/Y plotのvaluesに指定できます。
+モデルのリストは選択肢の隣にあるボタンで取得できます。いずれかのモデルを ``Additional Networks`` の ``Model ?`` で選択しておいてください。そのモデルと同じフォルダにあるモデルの一覧が取得されます。
 
 ![image](https://user-images.githubusercontent.com/52813779/212443639-97779d8d-0f7e-47f0-919c-41f053fe28a9.png)
 
