@@ -308,7 +308,7 @@ def get_all_models(paths, sort_by, filter_by):
   elif sort_by == "date":
     data = sorted(data, key=lambda x: -x["fileinfo"][1].st_mtime)
   elif sort_by == "path name":
-    data = sorted(data)
+    data = sorted(data, key=lambda x: x["fileinfo"][0])
   elif sort_by == "rating":
     data = sorted(data, key=lambda x: get_model_rating(x["fileinfo"][0]), reverse=True)
   elif sort_by == "has user metadata":
