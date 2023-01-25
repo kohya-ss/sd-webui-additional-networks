@@ -17,6 +17,7 @@ class LoRAInfo(NamedTuple):
   module: torch.nn.Module
   multiplier: float
   dim: int
+  alpha: float
 
 
 class LoRAModule(torch.nn.Module):
@@ -229,7 +230,7 @@ class LoRANetworkCompvis(torch.nn.Module):
                 if '_resblocks_23_' in module_name:                           # ignore last block in StabilityAi Text Encoder
                   break
                 lora_name = module_name + '_' + suffix
-                lora_info = LoRAInfo(lora_name, module_name, child_module, self.multiplier, self.lora_dim)
+                lora_info = LoRAInfo(lora_name, module_name, child_module, self.multiplier, self.lora_dim, self.alpha)
                 loras.append(lora_info)
 
                 replaced_modules.append(child_module)
@@ -342,8 +343,9 @@ class LoRANetworkCompvis(torch.nn.Module):
 
             def merge_weights(weight, up_weight, down_weight):
               # calculate in float
+              scale = lora_info.alpha / lora_info.dim
               dtype = weight.dtype
-              weight = weight.float() + lora_info.multiplier * (up_weight.to(dev, dtype=torch.float) @ down_weight.to(dev, dtype=torch.float))
+              weight = weight.float() + lora_info.multiplier * (up_weight.to(dev, dtype=torch.float) @ down_weight.to(dev, dtype=torch.float)) * scale
               weight = weight.to(dtype)
               return weight
 
@@ -367,6 +369,7 @@ class LoRANetworkCompvis(torch.nn.Module):
             for t in ["q", "k", "v", "out"]:
               del state_dict[f"{lora_info.module_name}_{t}_proj.lora_down.weight"]
               del state_dict[f"{lora_info.module_name}_{t}_proj.lora_up.weight"]
+              del state_dict[f"{lora_info.module_name}_{t}_proj.alpha"]
           else:
             # corresponding weight not exists: version mismatch
             pass
