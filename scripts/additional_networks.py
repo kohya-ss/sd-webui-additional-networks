@@ -69,7 +69,7 @@ LORA_TRAIN_METADATA_NAMES = {
 }
 
 
-MAX_MODEL_COUNT = shared.cmd_opts.max_lora_count
+MAX_MODEL_COUNT = shared.cmd_opts.addnet_max_model_count or 5
 LORA_MODEL_EXTS = [".pt", ".ckpt", ".safetensors"]
 re_legacy_hash = re.compile("\(([0-9a-f]{8})\)$") # matches 8-character hashes, new hash has 12 characters
 lora_models = {}       # "My_Lora(abcdef123456)" -> "C:/path/to/model.safetensors"
