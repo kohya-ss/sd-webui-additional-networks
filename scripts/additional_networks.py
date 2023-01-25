@@ -191,7 +191,7 @@ def traverse_all_files(curr_path, model_list):
 
 
 def get_model_hash(metadata, filename):
-  if not metadata:
+  if metadata is None:
     return hashes.calculate_sha256(filename)
 
   if "sshs_model_hash" in metadata:
@@ -201,7 +201,7 @@ def get_model_hash(metadata, filename):
 
 
 def get_legacy_hash(metadata, filename):
-  if not metadata:
+  if metadata is None:
     return sd_models.model_hash(filename)
 
   if "sshs_legacy_hash" in metadata:
