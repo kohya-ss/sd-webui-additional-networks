@@ -108,7 +108,7 @@ def get_axis_model_choices(i):
       sort_by = shared.opts.data.get("additional_networks_sort_models_by", "name")
       return get_model_list(module, model, "", sort_by)
 
-  return []
+  return [f"select `Model {i+1}` in `Additional Networks`. models in same folder for selected one will be shown here."]
 
 
 def update_script_args(p, value, arg_idx):
@@ -171,7 +171,7 @@ def format_lora_model(p, opt, x):
 
 
 for scriptDataTuple in scripts.scripts_data:
-    if os.path.basename(scriptDataTuple.path) == "xy_grid.py":
+    if os.path.basename(scriptDataTuple.path) == "xy_grid.py" or os.path.basename(scriptDataTuple.path) == "xyz_grid.py":
         xy_grid = scriptDataTuple.module
         for i in range(MAX_MODEL_COUNT):
            model = xy_grid.AxisOption(f"AddNet Model {i+1}", str, lambda p, x, xs, i=i: apply_model(p, x, xs, i), format_lora_model, confirm_models, cost=0.5, choices=lambda i=i: get_axis_model_choices(i))
