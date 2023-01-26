@@ -8,6 +8,9 @@ __Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``.__
 
 Note: Currently the models trained by the scripts 0.4.0 and the models for SD 2.x does not seem to be supported in Web UI.
 
+- 26 Jan. 2023, 2023/1/26
+  - Fix an error when ``preload.py`` is not loaded for some reason.
+  - 何らかの理由で ``preload.py`` が存在しない場合、読み込めない場合のエラーを修正しました。
 - 25 Jan. 2023, 2023/1/25
   - Support the latest web UI X/Y/Z plot.
   - Improve hashing algorithm to avoid unintended changes to model hash by updating metadata. Thanks to space-nuko!
