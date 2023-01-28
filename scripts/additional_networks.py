@@ -371,9 +371,10 @@ def find_closest_lora_model_name(search: str):
 def update_lora_models():
   global lora_models, lora_model_names, legacy_model_names
   paths = [lora_models_dir]
-  extra_lora_path = shared.opts.data.get("additional_networks_extra_lora_path", None)
-  if extra_lora_path and os.path.exists(extra_lora_path):
-    paths.append(extra_lora_path)
+  extra_lora_paths = shared.opts.data.get("additional_networks_extra_lora_path", "").split(",")
+  for path in extra_lora_paths:
+    if os.path.isdir(path):
+      paths.append(path)
 
   sort_by = shared.opts.data.get("additional_networks_sort_models_by", "name")
   filter_by = shared.opts.data.get("additional_networks_model_name_filter", "")
@@ -594,7 +595,7 @@ def on_ui_tabs():
 def on_ui_settings():
   section = ('additional_networks', "Additional Networks")
   shared.opts.add_option("additional_networks_extra_lora_path", shared.OptionInfo(
-      "", "Extra path to scan for LoRA models (e.g. training output directory)", section=section))
+      "", "Extra paths to scan for LoRA models, comma-separated", section=section))
   shared.opts.add_option("additional_networks_sort_models_by", shared.OptionInfo(
       "name", "Sort LoRA models by", gr.Radio, {"choices": ["name", "date", "path name", "rating", "has user metadata"]}, section=section))
   shared.opts.add_option("additional_networks_model_name_filter", shared.OptionInfo("", "LoRA model name filter", section=section))
