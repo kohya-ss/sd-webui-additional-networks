@@ -131,19 +131,30 @@ def confirm_models(p, xs):
 
 
 def apply_module(p, x, xs, i):
-    update_script_args(p, True, 0)      # set Enabled to True
-    update_script_args(p, x, 1 + 3 * i) # enabled, ({module}, model, weight), ...
+    update_script_args(p, True, 0)       # set Enabled to True
+    update_script_args(p, x, 2 + 4 * i)  # enabled, separate_weights, ({module}, model, weight_unet, weight_tenc), ...
 
 
 def apply_model(p, x, xs, i):
     name = find_closest_lora_model_name(x)
     update_script_args(p, True, 0)
-    update_script_args(p, name, 2 + 3 * i) # enabled, (module, {model}, weight), ...
+    update_script_args(p, name, 3 + 4 * i)  # enabled, separate_weights, (module, {model}, weight_unet, weight_tenc), ...
 
 
 def apply_weight(p, x, xs, i):
     update_script_args(p, True, 0)
-    update_script_args(p, x, 3 + 3 * i) # enabled, (module, model, {weight), ...
+    update_script_args(p, x, 4 + 4 * i ) # enabled, separate_weights, (module, model, {weight_unet, weight_tenc}), ...
+    update_script_args(p, x, 5 + 4 * i)
+
+
+def apply_weight_unet(p, x, xs, i):
+    update_script_args(p, True, 0)
+    update_script_args(p, x, 4 + 4 * i)  # enabled, separate_weights, (module, model, {weight_unet}, weight_tenc), ...
+
+
+def apply_weight_tenc(p, x, xs, i):
+    update_script_args(p, True, 0)
+    update_script_args(p, x, 5 + 4 * i)  # enabled, separate_weights, (module, model, weight_unet, {weight_tenc}), ...
 
 
 def format_lora_model(p, opt, x):
@@ -177,7 +188,9 @@ for scriptDataTuple in scripts.scripts_data:
         for i in range(MAX_MODEL_COUNT):
            model = xy_grid.AxisOption(f"AddNet Model {i+1}", str, lambda p, x, xs, i=i: apply_model(p, x, xs, i), format_lora_model, confirm_models, cost=0.5, choices=lambda i=i: get_axis_model_choices(i))
            weight = xy_grid.AxisOption(f"AddNet Weight {i+1}", float, lambda p, x, xs, i=i: apply_weight(p, x, xs, i), xy_grid.format_value_add_label, None, cost=0)
-           xy_grid.axis_options.extend([model, weight])
+           weight_unet = xy_grid.AxisOption(f"AddNet UNet Weight {i+1}", float, lambda p, x, xs, i=i: apply_weight_unet(p, x, xs, i), xy_grid.format_value_add_label, None, cost=0)
+           weight_tenc = xy_grid.AxisOption(f"AddNet TEnc Weight {i+1}", float, lambda p, x, xs, i=i: apply_weight_tenc(p, x, xs, i), xy_grid.format_value_add_label, None, cost=0)
+           xy_grid.axis_options.extend([model, weight, weight_unet, weight_tenc])
 
 
 def traverse_all_files(curr_path, model_list):
@@ -398,7 +411,7 @@ update_lora_models()
 class Script(scripts.Script):
   def __init__(self) -> None:
     super().__init__()
-    self.latest_params = [(None, None, None)] * MAX_MODEL_COUNT
+    self.latest_params = [(None, None, None, None)] * MAX_MODEL_COUNT
     self.latest_networks = []
     self.latest_model_hash = ""
 
@@ -412,13 +425,18 @@ class Script(scripts.Script):
     # NOTE: Changing the contents of `ctrls` means the XY Grid support may need
     # to be updated, see end of file
     ctrls = []
+    weight_sliders = []
     model_dropdowns = []
     self.infotext_fields = []
     with gr.Group():
       with gr.Accordion('Additional Networks', open=False):
-        enabled = gr.Checkbox(label='Enable', value=False)
-        ctrls.append(enabled)
-        self.infotext_fields.append((enabled, "AddNet Enabled"))
+        with gr.Row():
+          enabled = gr.Checkbox(label='Enable', value=False)
+          ctrls.append(enabled)
+          self.infotext_fields.append((enabled, "AddNet Enabled"))
+          separate_weights = gr.Checkbox(label='Separate UNet/Text Encoder weights', value=False)
+          ctrls.append(separate_weights)
+          self.infotext_fields.append((separate_weights, "AddNet Separate Weights"))
 
         for i in range(MAX_MODEL_COUNT):
           with gr.Row():
@@ -430,15 +448,36 @@ class Script(scripts.Script):
             module.change(lambda module, model, i=i: update_axis_params(i, module, model), inputs=[module, model], outputs=[])
             model.change(lambda module, model, i=i: update_axis_params(i, module, model), inputs=[module, model], outputs=[])
 
-            weight = gr.Slider(label=f"Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=.05)
-          ctrls.extend((module, model, weight))
+            with gr.Column() as col:
+              weight = gr.Slider(label=f"Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=.05, visible=True)
+              weight_unet = gr.Slider(label=f"UNet Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=.05, visible=False)
+              weight_tenc = gr.Slider(label=f"TEnc Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=.05, visible=False)
+
+            weight.change(lambda w: (w, w), inputs=[weight], outputs=[weight_unet, weight_tenc])
+
+          ctrls.extend((module, model, weight_unet, weight_tenc))
+          weight_sliders.extend((weight, weight_unet, weight_tenc))
           model_dropdowns.append(model)
 
           self.infotext_fields.extend([
               (module, f"AddNet Module {i+1}"),
               (model, f"AddNet Model {i+1}"),
               (weight, f"AddNet Weight {i+1}"),
+              (weight_unet, f"AddNet Weight A {i+1}"),
+              (weight_tenc, f"AddNet Weight B {i+1}"),
           ])
+
+        def update_weight_sliders(separate, *sliders):
+          updates = []
+          for w, w_unet, w_tenc in zip(*(iter(sliders),) * 3):
+            if not separate:
+                w_unet = w
+                w_tenc = w
+            updates.append(gr.Slider.update(visible=not separate))            # Combined
+            updates.append(gr.Slider.update(visible=separate, value=w_unet))  # UNet
+            updates.append(gr.Slider.update(visible=separate, value=w_tenc))  # TEnc
+          return updates
+        separate_weights.change(update_weight_sliders, inputs=[separate_weights] + weight_sliders, outputs=weight_sliders)
 
         def refresh_all_models(*dropdowns):
           update_lora_models()
@@ -460,14 +499,15 @@ class Script(scripts.Script):
 
   def set_infotext_fields(self, p, params):
     for i, t in enumerate(params):
-      module, model, weight = t
-      if model is None or model == "None" or len(model) == 0 or weight == 0:
+      module, model, weight_unet, weight_tenc = t
+      if model is None or model == "None" or len(model) == 0 or (weight_unet == 0 and weight_tenc == 0):
         continue
       p.extra_generation_params.update({
           "AddNet Enabled": True,
           f"AddNet Module {i+1}": module,
           f"AddNet Model {i+1}": model,
-          f"AddNet Weight {i+1}": weight,
+          f"AddNet Weight A {i+1}": weight_unet,
+          f"AddNet Weight B {i+1}": weight_tenc,
       })
 
   def process(self, p, *args):
@@ -486,19 +526,19 @@ class Script(scripts.Script):
       return
 
     params = []
-    for i, ctrl in enumerate(args[1:]):
-      if i % 3 == 0:
+    for i, ctrl in enumerate(args[2:]):
+      if i % 4 == 0:
         param = [ctrl]
       else:
         param.append(ctrl)
-        if i % 3 == 2:
+        if i % 4 == 3:
           params.append(param)
 
     models_changed = (len(self.latest_networks) == 0)                   # no latest network (cleared by check-off)
     models_changed = models_changed or self.latest_model_hash != p.sd_model.sd_model_hash
     if not models_changed:
-      for (l_module, l_model, l_weight), (module, model, weight) in zip(self.latest_params, params):
-        if l_module != module or l_model != model or l_weight != weight:
+      for (l_module, l_model, l_weight_unet, l_weight_tenc), (module, model, weight_unet, weight_tenc) in zip(self.latest_params, params):
+        if l_module != module or l_model != model or l_weight_unet != weight_unet or l_weight_tenc != weight_tenc:
           models_changed = True
           break
 
@@ -507,10 +547,10 @@ class Script(scripts.Script):
       self.latest_params = params
       self.latest_model_hash = p.sd_model.sd_model_hash
 
-      for module, model, weight in self.latest_params:
+      for module, model, weight_unet, weight_tenc in self.latest_params:
         if model is None or model == "None" or len(model) == 0:
           continue
-        if weight == 0:
+        if weight_unet == 0 and weight_tenc == 0:
           print(f"ignore because weight is 0: {model}")
           continue
 
@@ -524,7 +564,7 @@ class Script(scripts.Script):
           print(f"file not found: {model_path}")
           continue
 
-        print(f"{module} weight: {weight}, model: {model}")
+        print(f"{module} weight_unet: {weight_unet}, weight_tenc: {weight_tenc}, model: {model}")
         if module == "LoRA":
           if os.path.splitext(model_path)[1] == '.safetensors':
             from safetensors.torch import load_file
@@ -532,7 +572,7 @@ class Script(scripts.Script):
           else:
             du_state_dict = torch.load(model_path, map_location='cpu')
 
-          network, info = lora_compvis.create_network_and_apply_compvis(du_state_dict, weight, text_encoder, unet)
+          network, info = lora_compvis.create_network_and_apply_compvis(du_state_dict, weight_unet, weight_tenc, text_encoder, unet)
           # in medvram, device is different for u-net and sd_model, so use sd_model's
           network.to(p.sd_model.device, dtype=p.sd_model.dtype)
 
@@ -607,13 +647,28 @@ def on_infotext_pasted(infotext, params):
   if "AddNet Enabled" not in params:
     params["AddNet Enabled"] = "False"
 
+  if "AddNet Separate Weights" not in params:
+    params["AddNet Separate Weights"] = "False"
+
   for i in range(MAX_MODEL_COUNT):
+    # Convert combined weight into new format
+    if f"AddNet Weight {i+1}" in params:
+      params[f"AddNet Weight A {i+1}"] = params[f"AddNet Weight {i+1}"]
+      params[f"AddNet Weight B {i+1}"] = params[f"AddNet Weight {i+1}"]
+
     if f"AddNet Module {i+1}" not in params:
       params[f"AddNet Module {i+1}"] = "LoRA"
     if f"AddNet Model {i+1}" not in params:
       params[f"AddNet Model {i+1}"] = "None"
-    if f"AddNet Weight {i+1}" not in params:
-      params[f"AddNet Weight {i+1}"] = "0"
+    if f"AddNet Weight A {i+1}" not in params:
+      params[f"AddNet Weight A {i+1}"] = "0"
+    if f"AddNet Weight B {i+1}" not in params:
+      params[f"AddNet Weight B {i+1}"] = "0"
+
+    params[f"AddNet Weight {i+1}"] = params[f"AddNet Weight A {i+1}"]
+
+    if params[f"AddNet Weight A {i+1}"] != params[f"AddNet Weight B {i+1}"]:
+      params["AddNet Separate Weights"] = "True"
 
     # Convert potential legacy name/hash to new format
     params[f"AddNet Model {i+1}"] = str(find_closest_lora_model_name(params[f"AddNet Model {i+1}"]))
