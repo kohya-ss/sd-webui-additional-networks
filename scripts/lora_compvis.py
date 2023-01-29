@@ -68,7 +68,7 @@ class LoRAModule(torch.nn.Module):
     return self.org_forward(x) + self.lora_up(self.lora_down(x)) * self.multiplier * self.scale
 
 
-def create_network_and_apply_compvis(du_state_dict, multiplier_unet, multiplier_tenc, text_encoder, unet, **kwargs):
+def create_network_and_apply_compvis(du_state_dict, multiplier_tenc, multiplier_unet, text_encoder, unet, **kwargs):
   # get device and dtype from unet
   for module in unet.modules():
     if module.__class__.__name__ == "Linear":
@@ -91,14 +91,15 @@ def create_network_and_apply_compvis(du_state_dict, multiplier_unet, multiplier_
   if network_alpha is None:
     network_alpha = network_dim
 
-  print(f"dimension: {network_dim}, multiplier_unet: {multiplier_unet}, multiplier_tenc: {multiplier_tenc}")
+  print(f"dimension: {network_dim}, alpha: {network_alpha}, multiplier_unet: {multiplier_unet}, multiplier_tenc: {multiplier_tenc}")
   if network_dim is None:
     print(f"The selected model is not LoRA or not trained by `sd-scripts`?")
     network_dim = 4
     network_alpha = 1
 
   # create, apply and load weights
-  network = LoRANetworkCompvis(text_encoder, unet, multiplier_unet=multiplier_unet, multiplier_tenc=multiplier_tenc, lora_dim=network_dim, alpha=network_alpha)
+  network = LoRANetworkCompvis(text_encoder, unet, multiplier_tenc=multiplier_tenc,
+                               multiplier_unet=multiplier_unet, lora_dim=network_dim, alpha=network_alpha)
   state_dict = network.apply_lora_modules(du_state_dict)              # some weights are applied to text encoder
   network.to(dtype)                                              # with this, if error comes from next line, the model will be used
   info = network.load_state_dict(state_dict, strict=False)
@@ -179,7 +180,7 @@ class LoRANetworkCompvis(torch.nn.Module):
         else:
           cv_name = f"lora_te_wrapped_transformer_text_model_encoder_layers_{cv_index}_{du_suffix}"
 
-    assert cv_name is not None, f"conversion failed: {du_name}"
+    assert cv_name is not None, f"conversion failed: {du_name}. the model may not be trained by `sd-scripts`."
     return cv_name
 
   @classmethod
@@ -197,7 +198,7 @@ class LoRANetworkCompvis(torch.nn.Module):
 
     return new_sd
 
-  def __init__(self, text_encoder, unet, multiplier_unet=1.0, multiplier_tenc=1.0, lora_dim=4, alpha=1) -> None:
+  def __init__(self, text_encoder, unet, multiplier_tenc=1.0, multiplier_unet=1.0, lora_dim=4, alpha=1) -> None:
     super().__init__()
     self.multiplier_unet = multiplier_unet
     self.multiplier_tenc = multiplier_tenc
@@ -245,12 +246,12 @@ class LoRANetworkCompvis(torch.nn.Module):
         LoRANetworkCompvis.LORA_PREFIX_UNET, unet, LoRANetworkCompvis.UNET_TARGET_REPLACE_MODULE, self.multiplier_unet)
     print(f"create LoRA for U-Net: {len(self.unet_loras)} modules.")
 
-    # make backup of original forward/weights, if multiple modules are applied, do in 1st module onnly
+    # make backup of original forward/weights, if multiple modules are applied, do in 1st module only
     backed_up = False                     # messaging purpose only
     for rep_module in te_rep_modules + unet_rep_modules:
-      if rep_module.__class__.__name__ == "MultiheadAttention":      # multiple modules in list, prevent to backed up forward
+      if rep_module.__class__.__name__ == "MultiheadAttention":      # multiple MHA modules are in list, prevent to backed up forward
         if not hasattr(rep_module, "_lora_org_weights"):
-          # avoid updating, state_dict is reference to original weights
+          # avoid updating of original weights. state_dict is reference to original weights
           rep_module._lora_org_weights = copy.deepcopy(rep_module.state_dict())
           backed_up = True
       elif not hasattr(rep_module, "_lora_org_forward"):

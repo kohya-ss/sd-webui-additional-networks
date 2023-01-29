@@ -449,6 +449,8 @@ class Script(scripts.Script):
             module.change(lambda module, model, i=i: update_axis_params(i, module, model), inputs=[module, model], outputs=[])
             model.change(lambda module, model, i=i: update_axis_params(i, module, model), inputs=[module, model], outputs=[])
 
+            # perhaps there is no user to train Text Encoder only, Weight A is U-Net
+            # The name of label will be changed in future (Weight A and B), but UNet and TEnc for now for easy understanding
             with gr.Column() as col:
               weight = gr.Slider(label=f"Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=.05, visible=True)
               weight_unet = gr.Slider(label=f"UNet Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=.05, visible=False)
@@ -573,7 +575,7 @@ class Script(scripts.Script):
           else:
             du_state_dict = torch.load(model_path, map_location='cpu')
 
-          network, info = lora_compvis.create_network_and_apply_compvis(du_state_dict, weight_unet, weight_tenc, text_encoder, unet)
+          network, info = lora_compvis.create_network_and_apply_compvis(du_state_dict, weight_tenc, weight_unet, text_encoder, unet)
           # in medvram, device is different for u-net and sd_model, so use sd_model's
           network.to(p.sd_model.device, dtype=p.sd_model.dtype)
 
