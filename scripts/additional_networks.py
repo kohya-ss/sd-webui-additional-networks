@@ -650,6 +650,7 @@ def on_infotext_pasted(infotext, params):
   if "AddNet Enabled" not in params:
     params["AddNet Enabled"] = "False"
 
+  # TODO changing "AddNet Separate Weights" does not seem to work
   if "AddNet Separate Weights" not in params:
     params["AddNet Separate Weights"] = "False"
 
