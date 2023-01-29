@@ -648,7 +648,7 @@ def on_ui_tabs():
 def on_ui_settings():
   section = ('additional_networks', "Additional Networks")
   shared.opts.add_option("additional_networks_extra_lora_path", shared.OptionInfo(
-      "", "Extra paths to scan for LoRA models, comma-separated", section=section))
+      "", """Extra paths to scan for LoRA models, comma-separated. Paths containing commas must be enclosed in double quotes. In the path, " (one quote) must be replaced by "" (two quotes).""", section=section))
   shared.opts.add_option("additional_networks_sort_models_by", shared.OptionInfo(
       "name", "Sort LoRA models by", gr.Radio, {"choices": ["name", "date", "path name", "rating", "has user metadata"]}, section=section))
   shared.opts.add_option("additional_networks_model_name_filter", shared.OptionInfo("", "LoRA model name filter", section=section))
