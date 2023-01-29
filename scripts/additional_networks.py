@@ -156,6 +156,17 @@ def apply_weight_tenc(p, x, xs, i):
     update_script_args(p, True, 0)
     update_script_args(p, x, 5 + 4 * i)  # enabled, separate_weights, (module, model, weight_unet, {weight_tenc}), ...
 
+def split_path_list(path_list: str) -> list[str]:
+    import csv
+    from io import StringIO
+
+    pl = []
+    with StringIO() as f:
+        f.write(path_list)
+        f.seek(0)
+        for r in csv.reader(f):
+            pl += r
+    return pl
 
 def format_lora_model(p, opt, x):
     model = find_closest_lora_model_name(x)
@@ -169,7 +180,7 @@ def format_lora_model(p, opt, x):
     if not metadata:
         return value
 
-    metadata_names = shared.opts.data.get("additional_networks_xy_grid_model_metadata", "").split(",")
+    metadata_names = split_path_list(shared.opts.data.get("additional_networks_xy_grid_model_metadata", ""))
     if not metadata_names:
         return value
 
@@ -384,7 +395,7 @@ def find_closest_lora_model_name(search: str):
 def update_lora_models():
   global lora_models, lora_model_names, legacy_model_names
   paths = [lora_models_dir]
-  extra_lora_paths = shared.opts.data.get("additional_networks_extra_lora_path", "").split(",")
+  extra_lora_paths = split_path_list(shared.opts.data.get("additional_networks_extra_lora_path", ""))
   for path in extra_lora_paths:
     if os.path.isdir(path):
       paths.append(path)
