@@ -6,29 +6,14 @@
 
 __Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``.__ Thank you for great work!!!
 
-Note: Currently the models trained by the scripts 0.4.0 and the models for SD 2.x does not seem to be supported in Web UI.
+Note: Currently the models models for SD 2.x does not seem to be supported in Web UI. The models trained by the scripts 0.4.0 seem to be supported. 
 
-- 27 Jan. 2023, 2023/1/27
-  - Fix an error with SD2.x LoRA without ``alpha`` (trained by the scripts before 0.4.0).
-  - ``alpha``のないSD2.xのLoRAモデル（0.4.0以前のバージョンで学習されたモデル）が正しく適用されない不具合を修正しました。
-- 26 Jan. 2023, 2023/1/26
-  - Fix an error when ``preload.py`` is not loaded for some reason.
-  - 何らかの理由で ``preload.py`` が存在しない場合、読み込めない場合のエラーを修正しました。
-- 25 Jan. 2023, 2023/1/25
-  - Support the latest web UI X/Y/Z plot.
-  - Improve hashing algorithm to avoid unintended changes to model hash by updating metadata. Thanks to space-nuko!
-  - Now the list of models in X/Y/Z plot can be retrieved with the next button. Thanks to space-nuko!
-    - Please select any model in ``Model ?`` at ``Additional Networks`` in order to make the button work. Models in the same folder as the model will be listed.
-    - ``Swap axes`` buttons do not seem to swap the model listing button. Please do not use the swap axes buttons. This seems to be the web UI issue.
-  - __Experimenatal__ ``--addnet-max-model-count`` option is added to web UI to use more than 5 models in the same time. Thanks to Fannovel16!
-    - like ``webui.bat --addnet-max-model-count 8``
-  - Web UI最新版のX/Y/Z plotに対応しました。
-  - メタデータの更新によりモデルのハッシュ値が変わるのを避けるため、ハッシュ計算のアルゴリズムを更新しました。space-nuko氏に感謝します。
-  - X/Y/Z plotのモデルリストが、選択肢の隣にあるボタンで取得できるようになりました。 space-nuko氏に感謝します。
-    - いずれかのモデルを ``Additional Networks`` の ``Model ?`` で選択しておいてください。そのモデルと同じフォルダにあるモデルの一覧が取得されます。
-    - ``Swap axes`` ボタンはモデルリストボタンについて正しく動作しないようです。Web UIの問題のようです。Swap axesボタンを使用せず運用願います。
-  - __実験的オプション__ ``--addnet-max-model-count``オプションがWeb UIに追加されます。 5より多くの任意の数のLoRAモデル等を同時に指定できるようになります。Fannovel16氏に感謝します。
-    - ``webui.bat --addnet-max-model-count 8`` のように指定してください。
+- 29 Jan. 2023, 2023/1/29
+  - Support multiple LoRA model directories. You can set a comma-separated list in ``Extra paths to scan for LoRA models`` at ``Settings`` tab. Thanks to space-nuko!
+
+  - Add separated U-Net/Text Encoder weight sliders. Thanks to Naegles and space-nuko!
+  - 複数のモデルディレクトリを指定できるようになりました。``Settings`` タブの ``Extra paths to scan for LoRA models`` にカンマ区切りで指定してください。space-nuko氏に感謝します。
+  - U-Net/Text Encoder に独立して重みを指定できるようになりました。Naegles氏およびspace-nuko氏に感謝します。
 
 Please read [Releases](https://github.com/kohya-ss/sd-webui-additional-networks/releases) for recent updates.
 最近の更新情報は [Release](https://github.com/kohya-ss/sd-webui-additional-networks/releases) をご覧ください。
