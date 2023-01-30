@@ -90,7 +90,21 @@ def legacy_hash_file(filename):
       return sd_models.model_hash(filename)
 
 
-DTYPES = {"F32": torch.float32, "F16": torch.float16, "BF16": torch.bfloat16}
+DTYPES = {
+    "F64": torch.float64,
+    "F32": torch.float32,
+    "F16": torch.float16,
+    "BF16": torch.bfloat16,
+    "I64": torch.int64,
+    # "U64": torch.uint64,
+    "I32": torch.int32,
+    # "U32": torch.uint32,
+    "I16": torch.int16,
+    # "U16": torch.uint16,
+    "I8": torch.int8,
+    "U8": torch.uint8,
+    "BOOL": torch.bool
+}
 
 
 def create_tensor(storage, info, offset):

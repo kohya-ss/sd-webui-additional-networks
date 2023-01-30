@@ -82,7 +82,6 @@ def encode_pil_to_base64(image):
     return base64.b64encode(bytes_data)
 
 
-
 def open_folder(f):
   if not os.path.exists(f):
     print(f'Folder "{f}" does not exist. After you create an image, the folder will be created.')
@@ -186,7 +185,7 @@ Loads a cover image either from embedded metadata or an image file with
   """
   cover_images = json.loads(metadata.get("ssmd_cover_images", "[]"))
   cover_image = None
-  if len(cover_images) == 0:
+  if len(cover_images) > 0:
     print("[MetadataEditor] Loading embedded cover image.")
     cover_image = decode_base64_to_pil(cover_images[0])
   else:
@@ -281,7 +280,7 @@ Writes metadata from the Gradio components to the model file
     "sshs_legacy_hash": legacy_hash
   }
 
-  model_util.write_lora_metadata(model_path, module, updates)
+  model_util.write_model_metadata(model_path, module, updates)
   if cover_image is None:
     delete_webui_model_preview_image(model_path)
   else:

@@ -28,11 +28,6 @@ def is_safetensors(filename):
     return os.path.splitext(filename)[1] == ".safetensors"
 
 
-#
-# Metadata handling
-#
-
-
 def read_model_metadata(model_path, module):
   if model_path.startswith("\"") and model_path.endswith("\""):             # trim '"' at start/end
     model_path = model_path[1:-1]
@@ -267,9 +262,7 @@ def find_closest_lora_model_name(search: str):
     # Match model path, case-sensitive (from metadata editor)
     # "C:/path/to/mymodel-epoch00002.safetensors"
     if os.path.isfile(search):
-        print(f"GETPATH {search}")
         import json
-        print(f"{json.dumps(list(lora_models.values()))}")
         find = os.path.normpath(search)
         value = next((k for k in lora_models.keys() if lora_models[k] == find), None)
         if value:
