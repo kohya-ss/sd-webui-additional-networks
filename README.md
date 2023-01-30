@@ -8,6 +8,9 @@ __Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``.__
 
 Note: Currently the models models for SD 2.x does not seem to be supported in Web UI. The models trained by the scripts 0.4.0 seem to be supported. 
 
+- 30 Jan. 2023, 2023/1/30
+  - Fix to allow folder names containing commas in ``Extra paths to scan for LoRA models``. Enclose in ``"``. Thanks to shirayu!
+  - ``Extra paths to scan for LoRA models`` でのモデルディレクトリの指定時にカンマを含むフォルダ名が使用できるようになりました。``"`` で囲んでください。shirayu氏に感謝します。
 - 29 Jan. 2023, 2023/1/29
   - Support multiple LoRA model directories. You can set a comma-separated list in ``Extra paths to scan for LoRA models`` at ``Settings`` tab. Thanks to space-nuko!
 
