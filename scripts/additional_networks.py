@@ -7,6 +7,7 @@ import sys
 import inspect
 import re
 import tqdm
+from typing import List
 from collections import OrderedDict
 from multiprocessing.pool import ThreadPool as Pool
 
@@ -156,7 +157,7 @@ def apply_weight_tenc(p, x, xs, i):
     update_script_args(p, True, 0)
     update_script_args(p, x, 5 + 4 * i)  # enabled, separate_weights, (module, model, weight_unet, {weight_tenc}), ...
 
-def split_path_list(path_list: str) -> list[str]:
+def split_path_list(path_list: str) -> List[str]:
     import csv
     from io import StringIO
 
