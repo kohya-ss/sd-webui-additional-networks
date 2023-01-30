@@ -1,0 +1,18 @@
+#additional_networks_cover_image,
+#additional_networks_cover_image > .h-60,
+#additional_networks_cover_image > .h-60 > div,
+#additional_networks_cover_image > .h-60 > div > img
+{
+    height: 480px !important;
+    max-height: 480px !important;
+    min-height: 480px !important;
+}
+
+[id^=additional_networks_send_to_] {
+    display: flex;
+    align-content: center;
+    justify-content: center;
+    max-width: 2.5em;
+    min-width: 2.5em;
+    height: 2.4em;
+}
