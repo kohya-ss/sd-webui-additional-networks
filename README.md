@@ -8,15 +8,9 @@ __Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``.__
 
 Note: Currently the models models for SD 2.x does not seem to be supported in Web UI. The models trained by the scripts 0.4.0 seem to be supported. 
 
-- 30 Jan. 2023, 2023/1/30
-  - Fix to allow folder names containing commas in ``Extra paths to scan for LoRA models``. Enclose in ``"``. Thanks to shirayu!
-  - ``Extra paths to scan for LoRA models`` でのモデルディレクトリの指定時にカンマを含むフォルダ名が使用できるようになりました。``"`` で囲んでください。shirayu氏に感謝します。
-- 29 Jan. 2023, 2023/1/29
-  - Support multiple LoRA model directories. You can set a comma-separated list in ``Extra paths to scan for LoRA models`` at ``Settings`` tab. Thanks to space-nuko!
-
-  - Add separated U-Net/Text Encoder weight sliders. Thanks to Naegles and space-nuko!
-  - 複数のモデルディレクトリを指定できるようになりました。``Settings`` タブの ``Extra paths to scan for LoRA models`` にカンマ区切りで指定してください。space-nuko氏に感謝します。
-  - U-Net/Text Encoder に独立して重みを指定できるようになりました。Naegles氏およびspace-nuko氏に感謝します。
+- 31 Jan. 2023, 2023/1/31
+  - Metadata editor for LoRA models is now integrated in ``Additional Network`` tab. Documentation will be added later. Thanks to space-nuko!
+  - LoRAモデル用のメタデータエディタ ``Additional Network`` タブに追加されました。ドキュメントはのちほど追加予定です。space-nuko氏に感謝します。
 
 Please read [Releases](https://github.com/kohya-ss/sd-webui-additional-networks/releases) for recent updates.
 最近の更新情報は [Release](https://github.com/kohya-ss/sd-webui-additional-networks/releases) をご覧ください。
