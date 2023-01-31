@@ -306,8 +306,9 @@ def update_models():
   filter_by = shared.opts.data.get("additional_networks_model_name_filter", "")
   res, res_legacy = get_all_models(paths, sort_by, filter_by)
 
-  lora_models = OrderedDict(**{"None": None}, **res)
-  lora_model_names = {}
+  lora_models.clear()
+  lora_models["None"] = None
+  lora_models.update(res)
 
   for name_and_hash, filename in lora_models.items():
       if filename == None:
