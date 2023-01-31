@@ -9,7 +9,7 @@ import safetensors.torch
 
 from modules import sd_models
 
-# PyTorch 1.13 and later have _TypedStorage renamed to TypedStorage
+# PyTorch 1.13 and later have _UntypedStorage renamed to UntypedStorage
 UntypedStorage = torch.storage.UntypedStorage if hasattr(torch.storage, 'UntypedStorage') else torch.storage._UntypedStorage
 
 def read_metadata(filename):
