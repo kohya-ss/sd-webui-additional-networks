@@ -5,7 +5,6 @@
 
 import copy
 import math
-import os
 import re
 from typing import NamedTuple
 import torch
@@ -208,7 +207,7 @@ class LoRANetworkCompvis(torch.nn.Module):
     # create module instances
     self.v2 = False
 
-    def create_modules(prefix, root_module: torch.nn.Module, target_replace_modules, multiplier) -> list:
+    def create_modules(prefix, root_module: torch.nn.Module, target_replace_modules, multiplier):
       loras = []
       replaced_modules = []
       for name, module in root_module.named_modules():
