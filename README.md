@@ -8,6 +8,9 @@ __Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``.__
 
 Note: Currently the models models for SD 2.x does not seem to be supported in Web UI. The models trained by the scripts 0.4.0 seem to be supported. 
 
+- 1 Feb. 2023, 2023/2/1
+  - Add ``send to metadata editor`` button in ``Additional Network`` in ``txt2img`` and other tabs. Thanks to space-nuko!
+  - ``txt2img``タブ等にメタデータエディタに送るボタンが付きました。space-nuko氏に感謝します。
 - 31 Jan. 2023, 2023/1/31
   - Metadata editor for LoRA models is now integrated in ``Additional Network`` tab. Documentation will be added later. Thanks to space-nuko!
   - LoRAモデル用のメタデータエディタ ``Additional Network`` タブに追加されました。ドキュメントはのちほど追加予定です。space-nuko氏に感謝します。
