@@ -4,7 +4,6 @@ import torch
 
 import modules.scripts as scripts
 from modules import shared, script_callbacks
-from modules.ui_components import ToolButton
 import gradio as gr
 
 import modules.ui
@@ -13,6 +12,7 @@ from scripts import lora_compvis, model_util, metadata_editor, xyz_grid_support
 from scripts.model_util import lora_models, MAX_MODEL_COUNT
 
 
+memo_symbol = '\U0001F4DD' # 📝
 addnet_paste_params = {"txt2img": [], "img2img": []}
 
 
@@ -62,6 +62,16 @@ class Script(scripts.Script):
             model = gr.Dropdown(list(lora_models.keys()),
                                 label=f"Model {i+1}",
                                 value="None")
+            with gr.Row(visible=False):
+              model_path = gr.Textbox(value="None", interactive=False, visible=False)
+            model.change(lambda module, model, i=i: model_util.lora_models.get(model, "None"), inputs=[module, model], outputs=[model_path])
+
+            # Sending from the script UI to the metadata editor has to bypass
+            # gradio since this button will exit the gr.Blocks context by the
+            # time the metadata editor tab is created, so event handlers can't
+            # be registered on it by then.
+            model_info = gr.Button(value=memo_symbol, elem_id=f"additional_networks_send_to_metadata_editor_{i}")
+            model_info.click(fn=None, _js="addnet_send_to_metadata_editor", inputs=[module, model_path], outputs=[])
 
             module.change(lambda module, model, i=i: xyz_grid_support.update_axis_params(i, module, model), inputs=[module, model], outputs=[])
             model.change(lambda module, model, i=i: xyz_grid_support.update_axis_params(i, module, model), inputs=[module, model], outputs=[])

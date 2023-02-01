@@ -290,6 +290,21 @@ Writes metadata from the Gradio components to the model file
   return f"Model saved: {model_name}", model_hash, legacy_hash
 
 
+model_name_filter = ""
+
+
+def get_filtered_model_paths(s):
+  if not s:
+    return ["None"] + list(model_util.lora_models.values())
+
+  return ["None"] + [v for v in model_util.lora_models.values() if v and s in v.lower()]
+
+
+def get_filtered_model_paths_global():
+  global model_name_filter
+  return get_filtered_model_paths(model_name_filter)
+
+
 def setup_ui(addnet_paste_params):
   """
 :dict addnet_paste_params: Dictionary of txt2img/img2img controls for each model weight slider,
@@ -304,9 +319,23 @@ def setup_ui(addnet_paste_params):
 
       # Module and model selector
       with gr.Row():
-        module = gr.Dropdown(["LoRA"], label="Network module", value="LoRA", interactive=True)
-        model = gr.Dropdown(["None"] + list(model_util.lora_models.values()), label="Model", value="None", interactive=True)
-        modules.ui.create_refresh_button(model, model_util.update_models, lambda: {"choices": ["None"] + list(model_util.lora_models.values())}, "refresh_lora_models")
+        model_filter = gr.Textbox("", label="Model path filter", placeholder="Filter models by path name")
+        def update_model_filter(s):
+          global model_name_filter
+          model_name_filter = s.strip().lower()
+        model_filter.change(update_model_filter, inputs=[model_filter], outputs=[])
+      with gr.Row():
+        module = gr.Dropdown(["LoRA"], label="Network module", value="LoRA", interactive=True, elem_id="additional_networks_metadata_editor_module")
+        model = gr.Dropdown(get_filtered_model_paths_global(), label="Model", value="None", interactive=True,
+                                elem_id="additional_networks_metadata_editor_model")
+        modules.ui.create_refresh_button(model, model_util.update_models, lambda: {"choices": get_filtered_model_paths_global()}, "refresh_lora_models")
+
+        def submit_model_filter(s):
+          global model_name_filter
+          model_name_filter = s
+          paths = get_filtered_model_paths(s)
+          return gr.Dropdown.update(choices=paths, value="None")
+        model_filter.submit(submit_model_filter, inputs=[model_filter], outputs=[model])
 
       # Model hashes and path
       with gr.Row():

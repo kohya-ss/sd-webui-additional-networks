@@ -16,3 +16,8 @@
     min-width: 2.5em;
     height: 2.4em;
 }
+
+
+[id^=additional_networks_send_to_metadata_editor_] {
+    transform: translateY(25%);
+}
