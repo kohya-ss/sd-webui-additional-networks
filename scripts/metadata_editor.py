@@ -334,11 +334,7 @@ def setup_ui(addnet_paste_params):
           global model_name_filter
           model_name_filter = s
           paths = get_filtered_model_paths(s)
-          if len(paths) > 0:
-            value = paths[1]
-          else:
-            value = "None"
-          return gr.Dropdown.update(choices=paths, value=value)
+          return gr.Dropdown.update(choices=paths, value="None")
         model_filter.submit(submit_model_filter, inputs=[model_filter], outputs=[model])
 
       # Model hashes and path
