@@ -8,6 +8,9 @@ __Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``.__
 
 Note: Currently the models models for SD 2.x does not seem to be supported in Web UI. The models trained by the scripts 0.4.0 seem to be supported. 
 
+- 2 Feb. 2023, 2023/2/2
+  - This repo now has AGPL-3.0 license. Thanks to shirayu!
+  - リポジトリにAGPL-3.0ライセンスが追加されました。取りまとめいただいたshirayu氏に感謝します。
 - 1 Feb. 2023, 2023/2/1
   - Add ``send to metadata editor`` button in ``Additional Network`` in ``txt2img`` and other tabs. Thanks to space-nuko!
   - ``txt2img``タブ等にメタデータエディタに送るボタンが付きました。space-nuko氏に感謝します。
