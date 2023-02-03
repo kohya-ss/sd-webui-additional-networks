@@ -206,13 +206,13 @@ def refresh_metadata(module, model_path):
 Reads metadata from the model on disk and updates all Gradio components
   """
   if model_path == "None":
-    return {}, None, "", "", "", "", "", 0, "", "", "", "", ""
+    return {}, None, "", "", "", "", "", 0, "", "", "", "", "", {}
 
   if not os.path.isfile(model_path):
-    return {"info": f"Model path not found: {model_path}"}, None, "", "", "", "", "", 0, "", "", "", "", ""
+    return {"info": f"Model path not found: {model_path}"}, None, "", "", "", "", "", 0, "", "", "", "", "", {}
 
   if os.path.splitext(model_path)[1] != ".safetensors":
-    return {"info": "Model is not in .safetensors format."}, None, "", "", "", "", "", 0, "", "", "", "", ""
+    return {"info": "Model is not in .safetensors format."}, None, "", "", "", "", "", 0, "", "", "", "", "", {}
 
   metadata = model_util.read_model_metadata(model_path, module)
 
@@ -235,7 +235,21 @@ Reads metadata from the model on disk and updates all Gradio components
   model_hash = metadata.get("sshs_model_hash", model_util.cache("hashes").get(model_path, {}).get("model", ""))
   legacy_hash = metadata.get("sshs_legacy_hash", model_util.cache("hashes").get(model_path, {}).get("legacy", ""))
 
-  return training_params, cover_image, display_name, author, source, keywords, description, rating, tags, model_hash, legacy_hash, model_path, os.path.dirname(model_path)
+  top_tags = {}
+  if "ss_tag_frequency" in training_params:
+    tag_frequency = json.loads(training_params.pop("ss_tag_frequency"))
+    count_max = 0
+    for dir, frequencies in tag_frequency.items():
+      for tag, count in frequencies.items():
+        tag = tag.strip()
+        existing = top_tags.get(tag, 0)
+        top_tags[tag] = count + existing
+    top_tags = dict(sorted(top_tags.items(), key=lambda x: x[1], reverse=True))
+
+    count_max = max(top_tags.values())
+    top_tags = {k: float(v / count_max) for k, v in top_tags.items()}
+
+  return training_params, cover_image, display_name, author, source, keywords, description, rating, tags, model_hash, legacy_hash, model_path, os.path.dirname(model_path), top_tags
 
 
 def save_metadata(module, model_path, cover_image, display_name, author, source, keywords, description, rating, tags):
@@ -404,9 +418,19 @@ def setup_ui(addnet_paste_params):
         except:
             pass
 
-      # Training Parameters
-      with gr.Row():
-        metadata_view = gr.JSON(value={}, label="Training parameters")
+      # Training info, below cover image
+      with gr.Accordion("Training info", open=False):
+
+        # Top tags used
+        with gr.Row():
+          max_top_tags = int(shared.opts.data.get("additional_networks_max_top_tags", 20))
+          most_frequent_tags = gr.Label(value={}, label="Most frequent tags in captions", num_top_classes=max_top_tags)
+
+        # Training Parameters
+        with gr.Row():
+          metadata_view = gr.JSON(value={}, label="Training parameters")
+
+      # Hidden/internal
       with gr.Row(visible=False):
         info1 = gr.HTML()
         img_file_info = gr.Textbox(label="Generate Info", interactive=False, lines=6)
@@ -431,5 +455,5 @@ def setup_ui(addnet_paste_params):
   except:
       pass
 
-  model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, author, source, keywords, description, rating, tags, model_hash, legacy_hash, model_path, copy_metadata_dir])
+  model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, author, source, keywords, description, rating, tags, model_hash, legacy_hash, model_path, copy_metadata_dir, most_frequent_tags])
   save_metadata_button.click(save_metadata, inputs=[module, model, cover_image, display_name, author, source, keywords, description, rating, tags], outputs=[save_output, model_hash, legacy_hash])
