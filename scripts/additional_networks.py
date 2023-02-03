@@ -239,6 +239,7 @@ def on_ui_settings():
       True, "Make a backup copy of the model being edited when saving its metadata.", section=section))
   shared.opts.add_option("additional_networks_show_only_safetensors", shared.OptionInfo(False, "Only show .safetensors format models", section=section))
   shared.opts.add_option("additional_networks_show_only_models_with_metadata", shared.OptionInfo("disabled", "Only show models that have/don't have user-added metadata", gr.Radio, {"choices": ["disabled", "has metadata", "missing metadata"]}, section=section))
+  shared.opts.add_option("additional_networks_max_top_tags", shared.OptionInfo(20, "Max number of top tags to show", section=section))
 
 
 def on_infotext_pasted(infotext, params):
