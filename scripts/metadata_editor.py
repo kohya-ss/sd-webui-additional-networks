@@ -244,10 +244,11 @@ Reads metadata from the model on disk and updates all Gradio components
         tag = tag.strip()
         existing = top_tags.get(tag, 0)
         top_tags[tag] = count + existing
-    top_tags = dict(sorted(top_tags.items(), key=lambda x: x[1], reverse=True))
+    if len(top_tags) > 0:
+      top_tags = dict(sorted(top_tags.items(), key=lambda x: x[1], reverse=True))
 
-    count_max = max(top_tags.values())
-    top_tags = {k: float(v / count_max) for k, v in top_tags.items()}
+      count_max = max(top_tags.values())
+      top_tags = {k: float(v / count_max) for k, v in top_tags.items()}
 
   return training_params, cover_image, display_name, author, source, keywords, description, rating, tags, model_hash, legacy_hash, model_path, os.path.dirname(model_path), top_tags
 
