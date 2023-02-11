@@ -201,18 +201,23 @@ Loads a cover image either from embedded metadata or an image file with
   return cover_image
 
 
+# Dummy value since gr.Dataframe cannot handle an empty list
+# https://github.com/gradio-app/gradio/issues/3182
+unknown_folders = ["(Unknown)", 0, 0, 0]
+
+
 def refresh_metadata(module, model_path):
   """
 Reads metadata from the model on disk and updates all Gradio components
   """
   if model_path == "None":
-    return {}, None, "", "", "", "", "", 0, "", "", "", "", "", {}
+    return {}, None, "", "", "", "", "", 0, "", "", "", "", "", {}, [unknown_folders]
 
   if not os.path.isfile(model_path):
-    return {"info": f"Model path not found: {model_path}"}, None, "", "", "", "", "", 0, "", "", "", "", "", {}
+    return {"info": f"Model path not found: {model_path}"}, None, "", "", "", "", "", 0, "", "", "", "", "", {}, [unknown_folders]
 
   if os.path.splitext(model_path)[1] != ".safetensors":
-    return {"info": "Model is not in .safetensors format."}, None, "", "", "", "", "", 0, "", "", "", "", "", {}
+    return {"info": "Model is not in .safetensors format."}, None, "", "", "", "", "", 0, "", "", "", "", "", {}, [unknown_folders]
 
   metadata = model_util.read_model_metadata(model_path, module)
 
@@ -250,7 +255,19 @@ Reads metadata from the model on disk and updates all Gradio components
       count_max = max(top_tags.values())
       top_tags = {k: float(v / count_max) for k, v in top_tags.items()}
 
-  return training_params, cover_image, display_name, author, source, keywords, description, rating, tags, model_hash, legacy_hash, model_path, os.path.dirname(model_path), top_tags
+  dataset_folders = []
+  if "ss_dataset_dirs" in training_params:
+    dataset_dirs = json.loads(training_params.pop("ss_dataset_dirs"))
+    for dir, counts in dataset_dirs.items():
+      img_count = int(counts["img_count"])
+      n_repeats = int(counts["n_repeats"])
+      dataset_folders.append([dir, img_count, n_repeats, img_count * n_repeats])
+  if dataset_folders:
+    dataset_folders.append(["(Total)", sum(r[1] for r in dataset_folders), sum(r[2] for r in dataset_folders), sum(r[3] for r in dataset_folders)])
+  else:
+    dataset_folders.append(unknown_folders)
+
+  return training_params, cover_image, display_name, author, source, keywords, description, rating, tags, model_hash, legacy_hash, model_path, os.path.dirname(model_path), top_tags, dataset_folders
 
 
 def save_metadata(module, model_path, cover_image, display_name, author, source, keywords, description, rating, tags):
@@ -427,6 +444,16 @@ def setup_ui(addnet_paste_params):
           max_top_tags = int(shared.opts.data.get("additional_networks_max_top_tags", 20))
           most_frequent_tags = gr.Label(value={}, label="Most frequent tags in captions", num_top_classes=max_top_tags)
 
+        # Dataset folders
+        with gr.Row():
+          max_dataset_folders = int(shared.opts.data.get("additional_networks_max_dataset_folders", 20))
+          dataset_folders = gr.Dataframe(
+            headers=["Name", "Image Count", "Repeats", "Total Images"],
+            datatype=["str", "number", "number", "number"],
+            label="Dataset folder structure",
+            max_rows=max_dataset_folders,
+            col_count=(4, "fixed"))
+
         # Training Parameters
         with gr.Row():
           metadata_view = gr.JSON(value={}, label="Training parameters")
@@ -456,5 +483,5 @@ def setup_ui(addnet_paste_params):
   except:
       pass
 
-  model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, author, source, keywords, description, rating, tags, model_hash, legacy_hash, model_path, copy_metadata_dir, most_frequent_tags])
+  model.change(refresh_metadata, inputs=[module, model], outputs=[metadata_view, cover_image, display_name, author, source, keywords, description, rating, tags, model_hash, legacy_hash, model_path, copy_metadata_dir, most_frequent_tags, dataset_folders])
   save_metadata_button.click(save_metadata, inputs=[module, model, cover_image, display_name, author, source, keywords, description, rating, tags], outputs=[save_output, model_hash, legacy_hash])
