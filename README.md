@@ -2,30 +2,11 @@
 
 日本語の文章は下のほうにあります。
 
-## Updates / 更新情報
+[__Change History__](#change-history) is moved to the bottom of the page.
+更新履歴は[ページ末尾](#change-history)に移しました。
 
-__Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``.__ Thank you for great work!!!
+__Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``__ (SD 1.x based only).  Thank you for great work!!!
 
-Note: Currently the models models for SD 2.x does not seem to be supported in Web UI. The models trained by the scripts 0.4.0 seem to be supported. 
-
-- 10 Feb. 2023, 2023/2/10
-  - Fixed a bug that crashes the metadata editor on some latest models.
-  - 一部のモデルでメタデータエディタを開けない不具合を修正しました。
-- 3 Feb. 2023, 2023/2/3
-  - Tag frequency in training is shown in ``Training info`` in ``Additional Network`` tab. Thanks to space-nuko!
-  - 学習時のタグ頻度情報が ``Additional Network`` タブの ``Training info`` に表示されるようになりました。space-nuko氏に感謝します。
-- 2 Feb. 2023, 2023/2/2
-  - This repo now has AGPL-3.0 license. Thanks to shirayu!
-  - リポジトリにAGPL-3.0ライセンスが追加されました。取りまとめいただいたshirayu氏に感謝します。
-- 1 Feb. 2023, 2023/2/1
-  - Add ``send to metadata editor`` button in ``Additional Network`` in ``txt2img`` and other tabs. Thanks to space-nuko!
-  - ``txt2img``タブ等にメタデータエディタに送るボタンが付きました。space-nuko氏に感謝します。
-- 31 Jan. 2023, 2023/1/31
-  - Metadata editor for LoRA models is now integrated in ``Additional Network`` tab. Documentation will be added later. Thanks to space-nuko!
-  - LoRAモデル用のメタデータエディタ ``Additional Network`` タブに追加されました。ドキュメントはのちほど追加予定です。space-nuko氏に感謝します。
-
-Please read [Releases](https://github.com/kohya-ss/sd-webui-additional-networks/releases) for recent updates.
-最近の更新情報は [Release](https://github.com/kohya-ss/sd-webui-additional-networks/releases) をご覧ください。
 
 ## About
 
@@ -126,4 +107,28 @@ LoRAモデルをX/Y plotの値（選択対象）として使う場合は、カ�
 モデルのメタデータ（学習時のパラメータなど）をX/Y plotのラベルに使用できます。Web UI上部の ``Settings`` タブを開き、左下から ``Additional Networks`` を選び、 ``Metadata to show`` にカンマ区切りで項目名を指定してください（``ss_learning_rate, ss_num_epochs`` のような感じになります）。使える値は ``Additional Networks`` の ``Network metadata`` 欄にある値です。
 
 ![image](https://user-images.githubusercontent.com/52813779/212443781-1f4c442e-c2f3-47f8-b698-25fbe981f633.png)
+
+## Change History
+
+- 12 Feb. 2023, 2023/2/12
+  - __Dataset folder structure__ is shown in the metadata editor. Thanks to space-nuko!
+  - メタデータエディタにデータセットのフォルダ構成が表示されるようになりました。space-nuko氏に感謝します。
+- 10 Feb. 2023, 2023/2/10
+  - Fixed a bug that crashes the metadata editor on some latest models.
+  - 一部のモデルでメタデータエディタを開けない不具合を修正しました。
+- 3 Feb. 2023, 2023/2/3
+  - Tag frequency in training is shown in ``Training info`` in ``Additional Network`` tab. Thanks to space-nuko!
+  - 学習時のタグ頻度情報が ``Additional Network`` タブの ``Training info`` に表示されるようになりました。space-nuko氏に感謝します。
+- 2 Feb. 2023, 2023/2/2
+  - This repo now has AGPL-3.0 license. Thanks to shirayu!
+  - リポジトリにAGPL-3.0ライセンスが追加されました。取りまとめいただいたshirayu氏に感謝します。
+- 1 Feb. 2023, 2023/2/1
+  - Add ``send to metadata editor`` button in ``Additional Network`` in ``txt2img`` and other tabs. Thanks to space-nuko!
+  - ``txt2img``タブ等にメタデータエディタに送るボタンが付きました。space-nuko氏に感謝します。
+- 31 Jan. 2023, 2023/1/31
+  - Metadata editor for LoRA models is now integrated in ``Additional Network`` tab. Documentation will be added later. Thanks to space-nuko!
+  - LoRAモデル用のメタデータエディタ ``Additional Network`` タブに追加されました。ドキュメントはのちほど追加予定です。space-nuko氏に感謝します。
+
+Please read [Releases](https://github.com/kohya-ss/sd-webui-additional-networks/releases) for recent updates.
+最近の更新情報は [Release](https://github.com/kohya-ss/sd-webui-additional-networks/releases) をご覧ください。
 
