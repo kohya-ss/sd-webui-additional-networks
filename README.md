@@ -8,6 +8,9 @@ __Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``.__
 
 Note: Currently the models models for SD 2.x does not seem to be supported in Web UI. The models trained by the scripts 0.4.0 seem to be supported. 
 
+- 10 Feb. 2023, 2023/2/10
+  - Fixed a bug that crashes the metadata editor on some latest models.
+  - 一部のモデルでメタデータエディタを開けない不具合を修正しました。
 - 3 Feb. 2023, 2023/2/3
   - Tag frequency in training is shown in ``Training info`` in ``Additional Network`` tab. Thanks to space-nuko!
   - 学習時のタグ頻度情報が ``Additional Network`` タブの ``Training info`` に表示されるようになりました。space-nuko氏に感謝します。
