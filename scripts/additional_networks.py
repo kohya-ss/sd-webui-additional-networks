@@ -141,19 +141,22 @@ class Script(scripts.Script):
           f"AddNet Weight B {i+1}": weight_tenc,
       })
 
-  def process(self, p, *args):
+  def restore_networks(self, sd_model):
+    unet = sd_model.model.diffusion_model
+    text_encoder = sd_model.cond_stage_model
+
+    if len(self.latest_networks) > 0:
+      print("restoring last networks")
+      for network, _ in self.latest_networks[::-1]:
+        network.restore(text_encoder, unet)
+      self.latest_networks.clear()
+
+  def process_batch(self, p, *args, **kwargs):
     unet = p.sd_model.model.diffusion_model
     text_encoder = p.sd_model.cond_stage_model
 
-    def restore_networks():
-      if len(self.latest_networks) > 0:
-        print("restoring last networks")
-        for network, _ in self.latest_networks[::-1]:
-          network.restore(text_encoder, unet)
-        self.latest_networks.clear()
-
     if not args[0]:
-      restore_networks()
+      self.restore_networks(p.sd_model)
       return
 
     params = []
@@ -174,7 +177,7 @@ class Script(scripts.Script):
           break
 
     if models_changed:
-      restore_networks()
+      self.restore_networks(p.sd_model)
       self.latest_params = params
       self.latest_model_hash = p.sd_model.sd_model_hash
 
@@ -213,6 +216,14 @@ class Script(scripts.Script):
         print("setting (or sd model) changed. new networks created.")
 
     self.set_infotext_fields(p, self.latest_params)
+
+
+def on_script_unloaded():
+    if shared.sd_model:
+        for s in scripts.scripts_txt2img.alwayson_scripts:
+            if isinstance(s, Script):
+                s.restore_networks(shared.sd_model)
+                break
 
 
 def on_ui_tabs():
@@ -280,6 +291,7 @@ def on_infotext_pasted(infotext, params):
 xyz_grid_support.initialize(Script)
 
 
+script_callbacks.on_script_unloaded(on_script_unloaded)
 script_callbacks.on_ui_tabs(on_ui_tabs)
 script_callbacks.on_ui_settings(on_ui_settings)
 script_callbacks.on_infotext_pasted(on_infotext_pasted)
