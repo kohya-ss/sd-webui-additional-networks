@@ -246,6 +246,10 @@ def get_all_models(paths, sort_by, filter_by):
 
     name = os.path.splitext(os.path.basename(filename))[0]
 
+    # Commas in the model name will mess up infotext restoration since the
+    # infotext is delimited by commas
+    name = name.replace(",", "_")
+
     # Prevent a hypothetical "None.pt" from being listed.
     if name != "None":
       full_name = name + f"({model_hash[0:12]})"
