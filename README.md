@@ -110,6 +110,15 @@ LoRAモデルをX/Y plotの値（選択対象）として使う場合は、カ�
 
 ## Change History
 
+- 15 Feb. 2023, 2023/2/15
+  - Fix a bug that additional networks are applied twice when restarting UI.
+  - Now the cover image is not copied with ``Copy metadata`` in the metadata editor because it takes time.
+  - Allow additional networks to be swapped out between batches for other extensions.
+  - Thanks to space-nuko!
+  - 各ネットワークがWeb UIの再起動後に二重に適用された状態になるバグを修正しました。
+  - メタデータエディタで ``Copy metadata`` ボタンでカバー画像をコピーしなくなりました（処理に時間が掛かるため）。
+  - バッチごとにネットワークを切り替えられるようになりました（他の拡張からLoRAを切り替えられます）。
+  - space-nuko氏に感謝します。
 - 12 Feb. 2023, 2023/2/12
   - __Dataset folder structure__ is shown in the metadata editor. Thanks to space-nuko!
   - メタデータエディタにデータセットのフォルダ構成が表示されるようになりました。space-nuko氏に感謝します。
