@@ -164,14 +164,10 @@ Given a model with metadata, copies that metadata to all models in copy_dir.
         }
 
         for k, v in metadata.items():
-          if k.startswith("ssmd_"):
+          if k.startswith("ssmd_") and k != "ssmd_cover_images":
             updates[k] = v
 
         model_util.write_model_metadata(path, module, updates)
-        # if cover_image is None:
-        #   delete_webui_model_preview_image(model_path)
-        # else:
-        #   write_webui_model_preview_image(model_path, cover_image)
         count += 1
 
   print(f"[MetadataEditor] Updated {count} models in directory {copy_dir}.")

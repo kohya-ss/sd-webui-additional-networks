@@ -151,7 +151,7 @@ class Script(scripts.Script):
         network.restore(text_encoder, unet)
       self.latest_networks.clear()
 
-  def process(self, p, *args):
+  def process_batch(self, p, *args, **kwargs):
     unet = p.sd_model.model.diffusion_model
     text_encoder = p.sd_model.cond_stage_model
 
