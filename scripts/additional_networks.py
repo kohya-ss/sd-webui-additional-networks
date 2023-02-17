@@ -254,7 +254,10 @@ def on_ui_settings():
   shared.opts.add_option("additional_networks_max_dataset_folders", shared.OptionInfo(20, "Max number of dataset folders to show", section=section))
 
 
-def on_infotext_pasted(infotext, params):
+def on_infotext_pasted(params):
+  infotext = params.infotext
+  params = params.params
+
   if "AddNet Enabled" not in params:
     params["AddNet Enabled"] = "False"
 
