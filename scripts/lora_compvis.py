@@ -33,8 +33,16 @@ class LoRAModule(torch.nn.Module):
     if org_module.__class__.__name__ == 'Conv2d':
       in_dim = org_module.in_channels
       out_dim = org_module.out_channels
-      self.lora_down = torch.nn.Conv2d(in_dim, lora_dim, (1, 1), bias=False)
-      self.lora_up = torch.nn.Conv2d(lora_dim, out_dim, (1, 1), bias=False)
+
+      self.lora_dim = min(self.lora_dim, in_dim, out_dim)
+      if self.lora_dim != lora_dim:
+        print(f"{lora_name} dim (rank) is changed to: {self.lora_dim}")
+
+      kernel_size = org_module.kernel_size
+      stride = org_module.stride
+      padding = org_module.padding
+      self.lora_down = torch.nn.Conv2d(in_dim, self.lora_dim, kernel_size, stride, padding, bias=False)
+      self.lora_up = torch.nn.Conv2d(self.lora_dim, out_dim, (1, 1), (1, 1), bias=False)
     else:
       in_dim = org_module.in_features
       out_dim = org_module.out_features
@@ -77,28 +85,33 @@ def create_network_and_apply_compvis(du_state_dict, multiplier_tenc, multiplier_
       break
 
   # get dims (rank) and alpha from state dict
-  # currently it is assumed all LoRA have same alpha. alpha may be different in future.
-  network_alpha = None
-  network_dim = None
+  modules_dim = {}
+  modules_alpha = {}
   for key, value in du_state_dict.items():
-    if network_alpha is None and 'alpha' in key:
-      network_alpha = value
-    if network_dim is None and 'lora_down' in key and len(value.size()) == 2:
-      network_dim = value.size()[0]
-    if network_alpha is not None and network_dim is not None:
-      break
-  if network_alpha is None:
-    network_alpha = network_dim
+    if '.' not in key:
+      continue
 
-  print(f"dimension: {network_dim}, alpha: {network_alpha}, multiplier_unet: {multiplier_unet}, multiplier_tenc: {multiplier_tenc}")
-  if network_dim is None:
-    print(f"The selected model is not LoRA or not trained by `sd-scripts`?")
-    network_dim = 4
-    network_alpha = 1
+    lora_name = key.split('.')[0]
+    if 'alpha' in key:
+      modules_alpha[lora_name] = float(value.detach().cpu().numpy())
+    elif 'lora_down' in key:
+      dim = value.size()[0]
+      modules_dim[lora_name] = dim
+
+  # support old LoRA without alpha
+  for key in modules_dim.keys():
+    if key not in modules_alpha:
+      modules_alpha = modules_dim[key]
+
+  print(f"dimension: {set(modules_dim.values())}, alpha: {set(modules_alpha.values())}, multiplier_unet: {multiplier_unet}, multiplier_tenc: {multiplier_tenc}")
+
+  # if network_dim is None:
+  #   print(f"The selected model is not LoRA or not trained by `sd-scripts`?")
+  #   network_dim = 4
+  #   network_alpha = 1
 
   # create, apply and load weights
-  network = LoRANetworkCompvis(text_encoder, unet, multiplier_tenc=multiplier_tenc,
-                               multiplier_unet=multiplier_unet, lora_dim=network_dim, alpha=network_alpha)
+  network = LoRANetworkCompvis(text_encoder, unet, multiplier_tenc, multiplier_unet, modules_dim, modules_alpha)
   state_dict = network.apply_lora_modules(du_state_dict)              # some weights are applied to text encoder
   network.to(dtype)                                              # with this, if error comes from next line, the model will be used
   info = network.load_state_dict(state_dict, strict=False)
@@ -126,7 +139,7 @@ def create_network_and_apply_compvis(du_state_dict, multiplier_tenc, multiplier_
 class LoRANetworkCompvis(torch.nn.Module):
   # UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel", "Attention"]
   # TEXT_ENCODER_TARGET_REPLACE_MODULE = ["CLIPAttention", "CLIPMLP"]
-  UNET_TARGET_REPLACE_MODULE = ["SpatialTransformer"]  # , "Attention"]
+  UNET_TARGET_REPLACE_MODULE = ["SpatialTransformer", "ResBlock", "Downsample", "Upsample"]  # , "Attention"]
   TEXT_ENCODER_TARGET_REPLACE_MODULE = ["ResidualAttentionBlock", "CLIPAttention", "CLIPMLP"]
 
   LORA_PREFIX_UNET = 'lora_unet'
@@ -147,20 +160,83 @@ class LoRANetworkCompvis(torch.nn.Module):
 
         cv_index = 1 + du_block_index * 3 + du_attn_index      # 1,2, 4,5, 7,8
         cv_name = f"lora_unet_input_blocks_{cv_index}_1_{du_suffix}"
-      else:
-        m = re.search(r"_mid_block_attentions_(\d+)_(.+)", du_name)
-        if m:
-          du_suffix = m.group(2)
-          cv_name = f"lora_unet_middle_block_1_{du_suffix}"
-        else:
-          m = re.search(r"_up_blocks_(\d+)_attentions_(\d+)_(.+)", du_name)
-          if m:
-            du_block_index = int(m.group(1))
-            du_attn_index = int(m.group(2))
-            du_suffix = m.group(3)
+        return cv_name
 
-            cv_index = du_block_index * 3 + du_attn_index      # 3,4,5, 6,7,8, 9,10,11
-            cv_name = f"lora_unet_output_blocks_{cv_index}_1_{du_suffix}"
+      m = re.search(r"_mid_block_attentions_(\d+)_(.+)", du_name)
+      if m:
+        du_suffix = m.group(2)
+        cv_name = f"lora_unet_middle_block_1_{du_suffix}"
+        return cv_name
+
+      m = re.search(r"_up_blocks_(\d+)_attentions_(\d+)_(.+)", du_name)
+      if m:
+        du_block_index = int(m.group(1))
+        du_attn_index = int(m.group(2))
+        du_suffix = m.group(3)
+
+        cv_index = du_block_index * 3 + du_attn_index      # 3,4,5, 6,7,8, 9,10,11
+        cv_name = f"lora_unet_output_blocks_{cv_index}_1_{du_suffix}"
+        return cv_name
+
+      m = re.search(r"_down_blocks_(\d+)_resnets_(\d+)_(.+)", du_name)
+      if m:
+        du_block_index = int(m.group(1))
+        du_res_index = int(m.group(2))
+        du_suffix = m.group(3)
+        cv_suffix = {
+            'conv1': 'in_layers_2',
+            'conv2': 'out_layers_3',
+            'time_emb_proj': 'emb_layers_1',
+            'conv_shortcut': 'skip_connection'
+        }[du_suffix]
+
+        cv_index = 1 + du_block_index * 3 + du_res_index      # 1,2, 4,5, 7,8
+        cv_name = f"lora_unet_input_blocks_{cv_index}_0_{cv_suffix}"
+        return cv_name
+
+      m = re.search(r"_down_blocks_(\d+)_downsamplers_0_conv", du_name)
+      if m:
+        block_index = int(m.group(1))
+        cv_index = 3 + block_index * 3
+        cv_name = f"lora_unet_input_blocks_{cv_index}_0_op"
+        return cv_name
+
+      m = re.search(r"_mid_block_resnets_(\d+)_(.+)", du_name)
+      if m:
+        index = int(m.group(1))
+        du_suffix = m.group(2)
+        cv_suffix = {
+            'conv1': 'in_layers_2',
+            'conv2': 'out_layers_3',
+            'time_emb_proj': 'emb_layers_1',
+            'conv_shortcut': 'skip_connection'
+        }[du_suffix]
+        cv_name = f"lora_unet_middle_block_{index*2}_{cv_suffix}"
+        return cv_name
+
+      m = re.search(r"_up_blocks_(\d+)_resnets_(\d+)_(.+)", du_name)
+      if m:
+        du_block_index = int(m.group(1))
+        du_res_index = int(m.group(2))
+        du_suffix = m.group(3)
+        cv_suffix = {
+            'conv1': 'in_layers_2',
+            'conv2': 'out_layers_3',
+            'time_emb_proj': 'emb_layers_1',
+            'conv_shortcut': 'skip_connection'
+        }[du_suffix]
+
+        cv_index = du_block_index * 3 + du_res_index      # 1,2, 4,5, 7,8
+        cv_name = f"lora_unet_output_blocks_{cv_index}_0_{cv_suffix}"
+        return cv_name
+
+      m = re.search(r"_up_blocks_(\d+)_upsamplers_0_conv", du_name)
+      if m:
+        block_index = int(m.group(1))
+        cv_index = block_index * 3 + 2
+        cv_name = f"lora_unet_output_blocks_{cv_index}_{bool(block_index)+1}_conv"
+        return cv_name
+
     elif "lora_te_" in du_name:
       m = re.search(r"_model_encoder_layers_(\d+)_(.+)", du_name)
       if m:
@@ -197,41 +273,63 @@ class LoRANetworkCompvis(torch.nn.Module):
 
     return new_sd
 
-  def __init__(self, text_encoder, unet, multiplier_tenc=1.0, multiplier_unet=1.0, lora_dim=4, alpha=1) -> None:
+  def __init__(self, text_encoder, unet, multiplier_tenc=1.0, multiplier_unet=1.0, modules_dim=None, modules_alpha=None) -> None:
     super().__init__()
     self.multiplier_unet = multiplier_unet
     self.multiplier_tenc = multiplier_tenc
-    self.lora_dim = lora_dim
-    self.alpha = alpha
+
+    # check v1 or v2
+    self.v2 = False
+    for _, module in text_encoder.named_modules():
+      for _, child_module in module.named_modules():
+        if child_module.__class__.__name__ == 'MultiheadAttention':
+          self.v2 = True
+          break
+      if self.v2:
+        break
+
+    # convert lora name to CompVis and get dim and alpha
+    comp_vis_loras_dim_alpha = {}
+    for du_lora_name in modules_dim.keys():
+      dim = modules_dim[du_lora_name]
+      alpha = modules_alpha[du_lora_name]
+      comp_vis_lora_name = LoRANetworkCompvis.convert_diffusers_name_to_compvis(self.v2, du_lora_name)
+      comp_vis_loras_dim_alpha[comp_vis_lora_name] = (dim, alpha)
 
     # create module instances
-    self.v2 = False
-
     def create_modules(prefix, root_module: torch.nn.Module, target_replace_modules, multiplier):
       loras = []
       replaced_modules = []
       for name, module in root_module.named_modules():
         if module.__class__.__name__ in target_replace_modules:
           for child_name, child_module in module.named_modules():
-            if child_module.__class__.__name__ == "Linear" or (child_module.__class__.__name__ == "Conv2d" and child_module.kernel_size == (1, 1)):
+            # enumerate all Linear and Conv2d
+            if child_module.__class__.__name__ == "Linear" or child_module.__class__.__name__ == "Conv2d":
               lora_name = prefix + '.' + name + '.' + child_name
               lora_name = lora_name.replace('.', '_')
               if '_resblocks_23_' in lora_name:                           # ignore last block in StabilityAi Text Encoder
                 break
-              lora = LoRAModule(lora_name, child_module, multiplier, self.lora_dim, self.alpha)
+              if lora_name not in comp_vis_loras_dim_alpha:
+                break
+
+              dim, alpha = comp_vis_loras_dim_alpha[lora_name]
+              lora = LoRAModule(lora_name, child_module, multiplier, dim, alpha)
               loras.append(lora)
 
               replaced_modules.append(child_module)
             elif child_module.__class__.__name__ == "MultiheadAttention":
-              # make four modules: not replacing forward method but merge weights
-              self.v2 = True
-              for suffix in ['q', 'k', 'v', 'out']:
+              # make four modules: not replacing forward method but merge weights later
+              for suffix in ['q_proj', 'k_proj', 'v_proj', 'out_proj']:
                 module_name = prefix + '.' + name + '.' + child_name          # ~.attn
                 module_name = module_name.replace('.', '_')
                 if '_resblocks_23_' in module_name:                           # ignore last block in StabilityAi Text Encoder
                   break
+
                 lora_name = module_name + '_' + suffix
-                lora_info = LoRAInfo(lora_name, module_name, child_module, multiplier, self.lora_dim, self.alpha)
+                if lora_name not in comp_vis_loras_dim_alpha:
+                  break
+                dim, alpha = comp_vis_loras_dim_alpha[lora_name]
+                lora_info = LoRAInfo(lora_name, module_name, child_module, multiplier, dim, alpha)
                 loras.append(lora_info)
 
                 replaced_modules.append(child_module)
@@ -327,37 +425,43 @@ class LoRANetworkCompvis(torch.nn.Module):
         lora_dic[lora_info.lora_name] = lora_info
         if len(lora_dic) == 4:
           # calculate and apply
-          w_q_dw = state_dict.get(lora_info.module_name + '_q_proj.lora_down.weight')
-          if w_q_dw is not None:                       # corresponding LoRa module exists
-            w_q_up = state_dict[lora_info.module_name + '_q_proj.lora_up.weight']
-            w_k_dw = state_dict[lora_info.module_name + '_k_proj.lora_down.weight']
-            w_k_up = state_dict[lora_info.module_name + '_k_proj.lora_up.weight']
-            w_v_dw = state_dict[lora_info.module_name + '_v_proj.lora_down.weight']
-            w_v_up = state_dict[lora_info.module_name + '_v_proj.lora_up.weight']
-            w_out_dw = state_dict[lora_info.module_name + '_out_proj.lora_down.weight']
-            w_out_up = state_dict[lora_info.module_name + '_out_proj.lora_up.weight']
+          module = lora_info.module
+          module_name = lora_info.module_name
+          w_q_dw = state_dict.get(module_name + '_q_proj.lora_down.weight')
+          if w_q_dw is not None:                       # corresponding LoRA module exists
+            w_q_up = state_dict[module_name + '_q_proj.lora_up.weight']
+            w_k_dw = state_dict[module_name + '_k_proj.lora_down.weight']
+            w_k_up = state_dict[module_name + '_k_proj.lora_up.weight']
+            w_v_dw = state_dict[module_name + '_v_proj.lora_down.weight']
+            w_v_up = state_dict[module_name + '_v_proj.lora_up.weight']
+            w_out_dw = state_dict[module_name + '_out_proj.lora_down.weight']
+            w_out_up = state_dict[module_name + '_out_proj.lora_up.weight']
+            q_lora_info = lora_dic[module_name + '_q_proj']
+            k_lora_info = lora_dic[module_name + '_k_proj']
+            v_lora_info = lora_dic[module_name + '_v_proj']
+            out_lora_info = lora_dic[module_name + '_out_proj']
 
-            sd = lora_info.module.state_dict()
+            sd = module.state_dict()
             qkv_weight = sd['in_proj_weight']
             out_weight = sd['out_proj.weight']
             dev = qkv_weight.device
 
-            def merge_weights(weight, up_weight, down_weight):
+            def merge_weights(l_info, weight, up_weight, down_weight):
               # calculate in float
-              scale = lora_info.alpha / lora_info.dim
+              scale = l_info.alpha / l_info.dim
               dtype = weight.dtype
-              weight = weight.float() + lora_info.multiplier * (up_weight.to(dev, dtype=torch.float) @ down_weight.to(dev, dtype=torch.float)) * scale
+              weight = weight.float() + l_info.multiplier * (up_weight.to(dev, dtype=torch.float) @ down_weight.to(dev, dtype=torch.float)) * scale
               weight = weight.to(dtype)
               return weight
 
             q_weight, k_weight, v_weight = torch.chunk(qkv_weight, 3)
             if q_weight.size()[1] == w_q_up.size()[0]:
-              q_weight = merge_weights(q_weight, w_q_up, w_q_dw)
-              k_weight = merge_weights(k_weight, w_k_up, w_k_dw)
-              v_weight = merge_weights(v_weight, w_v_up, w_v_dw)
+              q_weight = merge_weights(q_lora_info, q_weight, w_q_up, w_q_dw)
+              k_weight = merge_weights(k_lora_info, k_weight, w_k_up, w_k_dw)
+              v_weight = merge_weights(v_lora_info, v_weight, w_v_up, w_v_dw)
               qkv_weight = torch.cat([q_weight, k_weight, v_weight])
 
-              out_weight = merge_weights(out_weight, w_out_up, w_out_dw)
+              out_weight = merge_weights(out_lora_info, out_weight, w_out_up, w_out_dw)
 
               sd['in_proj_weight'] = qkv_weight.to(dev)
               sd['out_proj.weight'] = out_weight.to(dev)
@@ -365,12 +469,12 @@ class LoRANetworkCompvis(torch.nn.Module):
               lora_info.module.load_state_dict(sd)
             else:
               # different dim, version mismatch
-              print(f"shape of weight is different: {lora_info.module_name}. SD version may be different")
+              print(f"shape of weight is different: {module_name}. SD version may be different")
 
             for t in ["q", "k", "v", "out"]:
-              del state_dict[f"{lora_info.module_name}_{t}_proj.lora_down.weight"]
-              del state_dict[f"{lora_info.module_name}_{t}_proj.lora_up.weight"]
-              alpha_key = f"{lora_info.module_name}_{t}_proj.alpha"
+              del state_dict[f"{module_name}_{t}_proj.lora_down.weight"]
+              del state_dict[f"{module_name}_{t}_proj.lora_up.weight"]
+              alpha_key = f"{module_name}_{t}_proj.alpha"
               if alpha_key in state_dict:
                 del state_dict[alpha_key]
           else:
