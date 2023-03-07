@@ -58,6 +58,22 @@ The metadata of the model can be drawn as legends. Move to ``Settings`` tab, sel
 
 ![image](https://user-images.githubusercontent.com/52813779/212443781-1f4c442e-c2f3-47f8-b698-25fbe981f633.png)
 
+## Apply LoRA by region mask
+
+By specifying the area with a mask image, each LoRA model can be applied only to the specified area of the image. Currently, only three models (Models 1 to 3) can be masked.
+
+The mask image is RGB image, with each RGB channel corresponding to LoRA models 1 to 3. It is applied after being resized to the size of the generated image.
+
+It can be combined with ControlNet.
+
+### Difference from Latent Couple extension and Composable LoRA
+
+'Latent Couple extension' masks the output of U-Net for each sub-prompt (AND-separated prompts), while our implementation masks the output of LoRA at each layer of U-Net. The mask is resized according to the tensor shape of each layer, so the resolution is particularly coarse at the deeper layers.
+
+'Composable LoRA' controls the area via Latent Couple extension by switching LoRA on or off for each sub-prompt, but this implementation works alone.
+
+This implementation does not work for all LoRA modules (LoRA modules associated with Text Encoder are not masked), and due to the coarse resolution, it is not possible to completely separate areas.
+
 ## この Web UI 拡張について
 
 LoRA などのネットワークを元の Stable Diffusion に追加し、画像生成を行うための拡張です。現在は LoRA のみ対応しています。
@@ -108,35 +124,36 @@ LoRAモデルをX/Y plotの値（選択対象）として使う場合は、カ�
 
 ![image](https://user-images.githubusercontent.com/52813779/212443781-1f4c442e-c2f3-47f8-b698-25fbe981f633.png)
 
+## LoRA の領域別適用
+
+適用する領域をマスク画像で指定することで、それぞれの LoRA モデルを画像の指定した部分にのみ適用することができます。現在はモデル1~3の3つのみ領域指定可能です。
+
+マスク画像はカラーの画像で、RGBの各チャネルが LoRA モデル1~3に対応します。生成画像サイズにリサイズされて適用されます。
+
+ControlNetと組み合わせることも可能です。
+
+### Latent Couple extension、Composable LoRAとの違い
+
+Latent Couple extension はサブプロンプト（ANDで区切られたプロンプト）ごとに、U-Net の出力をマスクしますが、当実装では U-Net の各層で LoRA の出力をマスクします。マスクは各層のテンソル形状に応じてリサイズされるため、深い層では特に解像度が粗くなります。
+
+Composable LoRA はサブプロンプトごとに LoRA の適用有無を切り替えることで Latent Couple extension を経由して影響範囲を制御しますが、当実装では単独で動作します。
+
+当実装はすべての LoRA モジュールに作用するわけではなく（Text Encoder に関連する LoRA モジュールはマスクされません）、また解像度が粗いため、完全に領域を分離することはできません。
+
 ## Change History
 
-- 15 Feb. 2023, 2023/2/15
-  - Fix a bug that additional networks are applied twice when restarting UI.
-  - Now the cover image is not copied with ``Copy metadata`` in the metadata editor because it takes time.
-  - Allow additional networks to be swapped out between batches for other extensions.
-  - Thanks to space-nuko!
-  - 各ネットワークがWeb UIの再起動後に二重に適用された状態になるバグを修正しました。
-  - メタデータエディタで ``Copy metadata`` ボタンでカバー画像をコピーしなくなりました（処理に時間が掛かるため）。
-  - バッチごとにネットワークを切り替えられるようになりました（他の拡張からLoRAを切り替えられます）。
-  - space-nuko氏に感謝します。
-- 12 Feb. 2023, 2023/2/12
-  - __Dataset folder structure__ is shown in the metadata editor. Thanks to space-nuko!
-  - メタデータエディタにデータセットのフォルダ構成が表示されるようになりました。space-nuko氏に感謝します。
-- 10 Feb. 2023, 2023/2/10
-  - Fixed a bug that crashes the metadata editor on some latest models.
-  - 一部のモデルでメタデータエディタを開けない不具合を修正しました。
-- 3 Feb. 2023, 2023/2/3
-  - Tag frequency in training is shown in ``Training info`` in ``Additional Network`` tab. Thanks to space-nuko!
-  - 学習時のタグ頻度情報が ``Additional Network`` タブの ``Training info`` に表示されるようになりました。space-nuko氏に感謝します。
-- 2 Feb. 2023, 2023/2/2
-  - This repo now has AGPL-3.0 license. Thanks to shirayu!
-  - リポジトリにAGPL-3.0ライセンスが追加されました。取りまとめいただいたshirayu氏に感謝します。
-- 1 Feb. 2023, 2023/2/1
-  - Add ``send to metadata editor`` button in ``Additional Network`` in ``txt2img`` and other tabs. Thanks to space-nuko!
-  - ``txt2img``タブ等にメタデータエディタに送るボタンが付きました。space-nuko氏に感謝します。
-- 31 Jan. 2023, 2023/1/31
-  - Metadata editor for LoRA models is now integrated in ``Additional Network`` tab. Documentation will be added later. Thanks to space-nuko!
-  - LoRAモデル用のメタデータエディタ ``Additional Network`` タブに追加されました。ドキュメントはのちほど追加予定です。space-nuko氏に感謝します。
+- 7 Mar 2023, 2023/3/7: Release v0.5.0
+  - Support current version of LoCon. Thank you very much KohakuBlueleaf for your help!
+    - LoCon will be enhanced in the future. Compatibility for future versions is not guaranteed.
+  - Support dynamic LoRA: different dimensions (ranks) and alpha for each module.
+  - Support LoRA for Conv2d (extended to conv2d with a kernel size not 1x1).
+  - Add masked LoRA feature (experimental.)
+  - 現在のバージョンの LoCon をサポートしました。 KohakuBlueleaf 氏のご支援に深く感謝します。
+    - LoCon が将来的に拡張された場合、それらのバージョンでの互換性は保証できません。
+  - dynamic LoRA の機能を追加しました。各モジュールで異なる dimension (rank) や alpha を持つ LoRA が使えます。
+  - Conv2d 拡張 LoRA をサポートしました。カーネルサイズが1x1でない Conv2d を対象とした LoRA が使えます。
+  - LoRA の適用領域指定機能を追加しました（実験的機能）。
+
 
 Please read [Releases](https://github.com/kohya-ss/sd-webui-additional-networks/releases) for recent updates.
 最近の更新情報は [Release](https://github.com/kohya-ss/sd-webui-additional-networks/releases) をご覧ください。

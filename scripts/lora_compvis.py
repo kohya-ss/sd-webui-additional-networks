@@ -62,17 +62,52 @@ class LoRAModule(torch.nn.Module):
     self.multiplier = multiplier
     self.org_forward = org_module.forward
     self.org_module = org_module                  # remove in applying
+    self.mask_dic = None
+    self.mask = None
 
   def apply_to(self):
     self.org_forward = self.org_module.forward
     self.org_module.forward = self.forward
     del self.org_module
 
+  def set_mask_dic(self, mask_dic):
+    # called before every generation
+
+    # check this module is related to h,w (not context and time emb)
+    if 'attn2_to_k' in self.lora_name or 'attn2_to_v' in self.lora_name or 'emb_layers' in self.lora_name:
+      # print(f"LoRA for context or time emb: {self.lora_name}")
+      self.mask_dic = None
+    else:
+      self.mask_dic = mask_dic
+
+    self.mask = None
+
   def forward(self, x):
     """
     may be cascaded.
     """
-    return self.org_forward(x) + self.lora_up(self.lora_down(x)) * self.multiplier * self.scale
+    if self.mask_dic is None:
+      return self.org_forward(x) + self.lora_up(self.lora_down(x)) * self.multiplier * self.scale
+
+    # regional LoRA
+
+    # calculate lora and get size
+    lx = self.lora_up(self.lora_down(x))
+
+    if self.mask is None:
+      if len(lx.size()) == 4:                       # b,c,h,w
+        area = lx.size()[2] * lx.size()[3]
+      else:
+        area = lx.size()[1]                         # b,seq,dim
+
+      # get mask
+      # print(self.lora_name, x.size(), lx.size(), area)
+      mask = self.mask_dic[area]
+      if len(lx.size()) == 3:
+        mask = torch.reshape(mask, (1, -1, 1))
+      self.mask = mask
+
+    return self.org_forward(x) + lx * self.multiplier * self.scale * self.mask
 
 
 def create_network_and_apply_compvis(du_state_dict, multiplier_tenc, multiplier_unet, text_encoder, unet, **kwargs):
@@ -101,7 +136,7 @@ def create_network_and_apply_compvis(du_state_dict, multiplier_tenc, multiplier_
   # support old LoRA without alpha
   for key in modules_dim.keys():
     if key not in modules_alpha:
-      modules_alpha = modules_dim[key]
+      modules_alpha[key] = modules_dim[key]
 
   print(f"dimension: {set(modules_dim.values())}, alpha: {set(modules_alpha.values())}, multiplier_unet: {multiplier_unet}, multiplier_tenc: {multiplier_tenc}")
 
@@ -277,6 +312,7 @@ class LoRANetworkCompvis(torch.nn.Module):
     super().__init__()
     self.multiplier_unet = multiplier_unet
     self.multiplier_tenc = multiplier_tenc
+    self.latest_mask_info = None
 
     # check v1 or v2
     self.v2 = False
@@ -522,3 +558,45 @@ class LoRANetworkCompvis(torch.nn.Module):
           del state_dict[key]
 
     return state_dict
+
+  def set_mask(self, mask, height=None, width=None):
+    if mask is None:
+      # clear latest mask
+      # print("clear mask")
+      self.latest_mask_info = None
+      for lora in self.unet_loras:
+        lora.set_mask_dic(None)
+      return
+
+    # check mask image and h/w are same
+    if self.latest_mask_info is not None and torch.equal(mask, self.latest_mask_info[0]) and (height, width) == self.latest_mask_info[1:]:
+      # print("mask not changed")
+      return
+
+    self.latest_mask_info = (mask, height, width)
+
+    org_dtype = mask.dtype
+    if mask.dtype == torch.bfloat16:
+      mask = mask.to(torch.float)
+
+    mask_dic = {}
+    mask = mask.unsqueeze(0).unsqueeze(1)             # b(1),c(1),h,w
+
+    def resize_add(mh, mw):
+      # print(mh, mw, mh * mw)
+      m = torch.nn.functional.interpolate(mask, (mh, mw), mode='bilinear')       # doesn't work in bf16
+      m = m.to(org_dtype)
+      mask_dic[mh * mw] = m
+
+    h = height // 8
+    w = width // 8
+    for i in range(4):
+      resize_add(h, w)
+      if h % 2 == 1 or w % 2 == 1:                # add extra shape if h/w is not divisible by 2
+        resize_add(h + h % 2, w + w % 2)
+      h = (h + 1) // 2
+      w = (w + 1) // 2
+
+    for lora in self.unet_loras:
+      lora.set_mask_dic(mask_dic)
+    return
