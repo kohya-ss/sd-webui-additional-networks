@@ -76,7 +76,7 @@ It can be combined with ControlNet.
 | |pose|mask|
 | |<img src="https://user-images.githubusercontent.com/52813779/223677653-cfd7fb36-afc1-49e8-9253-4bc01c5dad99.png" width="256">|<img src="https://user-images.githubusercontent.com/52813779/223677672-5e2fc729-01ee-4c62-8457-2e125bb0e24f.png" width="256">
 
-Sample images are generated with [wd-1-5-beta2-aesthetic-fp16.safetensors](https://huggingface.co/waifu-diffusion/wd-1-5-beta2) and three LoRAs: two chracter LoRAs (masked) and one style LoRA (not masked). Used ControlNet is [diff_control_wd15beta2_pose.safetensors](https://huggingface.co/furusu/ControlNet).
+Sample images are generated with [wd-1-5-beta2-aesthetic-fp16.safetensors](https://huggingface.co/waifu-diffusion/wd-1-5-beta2) and three LoRAs: two character LoRAs (masked) and one style LoRA (not masked). Used ControlNet is [diff_control_wd15beta2_pose.safetensors](https://huggingface.co/furusu/ControlNet).
 
 ### Difference from 'Latent Couple extension' and 'Composable LoRA'
 
