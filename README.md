@@ -5,7 +5,9 @@
 [__Change History__](#change-history) is moved to the bottom of the page.
 更新履歴は[ページ末尾](#change-history)に移しました。
 
-__Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``__ (SD 1.x based only).  Thank you for great work!!!
+__Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``__ (SD 1.x based only, except Conv2d-3x3 LoRA).  Thank you for great work!!!
+
+Update: Support current version of [LoCon](https://github.com/KohakuBlueleaf/LoCon). __Thank you very much KohakuBlueleaf for your help!__
 
 
 ## About
