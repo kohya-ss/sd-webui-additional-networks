@@ -1,6 +1,7 @@
 import os
 
 import torch
+import numpy as np
 
 import modules.scripts as scripts
 from modules import shared, script_callbacks
@@ -122,6 +123,12 @@ class Script(scripts.Script):
             updates.append(update)
           return updates
 
+        # mask for regions
+        with gr.Accordion('Extra args', open=False):
+          with gr.Row():
+            mask_image = gr.Image(label='mask image:')
+            ctrls.append(mask_image)
+
         refresh_models = gr.Button(value='Refresh models')
         refresh_models.click(refresh_all_models, inputs=model_dropdowns, outputs=model_dropdowns)
         ctrls.append(refresh_models)
@@ -214,6 +221,26 @@ class Script(scripts.Script):
           self.latest_networks.append((network, model))
       if len(self.latest_networks) > 0:
         print("setting (or sd model) changed. new networks created.")
+
+    # apply mask: currently only top 3 networks are supported
+    if len(self.latest_networks) > 0:
+      mask_image = args[-2]
+      if mask_image is not None:
+        mask_image = mask_image.astype(np.float32) / 255.0
+        print(f"use mask image to control LoRA regions.")
+        for i, (network, model) in enumerate(self.latest_networks[:3]):
+          if not hasattr(network, "set_mask"):
+            continue
+          mask = mask_image[:, :, i]               # R,G,B
+          if mask.max() <= 0:
+            continue
+          mask = torch.tensor(mask, dtype=p.sd_model.dtype, device=p.sd_model.device)
+          network.set_mask(mask, height=p.height, width=p.width)
+          print(f"apply mask. channel: {i}, model: {model}")
+      else:
+        for network, _ in self.latest_networks:
+          if hasattr(network, "set_mask"):
+            network.set_mask(None)
 
     self.set_infotext_fields(p, self.latest_params)
 
