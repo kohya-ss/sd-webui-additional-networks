@@ -225,7 +225,6 @@ class Script(scripts.Script):
     # apply mask: currently only top 3 networks are supported
     if len(self.latest_networks) > 0:
       mask_image = args[-2]
-      print(mask_image.shape if mask_image is not None else "NONE")
       if mask_image is not None:
         mask_image = mask_image.astype(np.float32) / 255.0
         print(f"use mask image to control LoRA regions.")
