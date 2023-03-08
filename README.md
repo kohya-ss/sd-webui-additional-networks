@@ -58,21 +58,33 @@ The metadata of the model can be drawn as legends. Move to ``Settings`` tab, sel
 
 ![image](https://user-images.githubusercontent.com/52813779/212443781-1f4c442e-c2f3-47f8-b698-25fbe981f633.png)
 
-## Apply LoRA by region mask
+## Specify target region of LoRA by mask (__experimental__)
 
-By specifying the area with a mask image, each LoRA model can be applied only to the specified area of the image. Currently, only three models (Models 1 to 3) can be masked.
+Open `Extra args` and drop a mask image to `mask image`.
 
-The mask image is RGB image, with each RGB channel corresponding to LoRA models 1 to 3. It is applied after being resized to the size of the generated image.
+By specifying with the mask image, each LoRA model can be applied only to the specified region of the image. Currently, only three models (Models 1 to 3) can be masked.
+
+The mask image is RGB image, with each channel (R, G and B) corresponding to LoRA models 1 to 3. Each channel can be overlapped. For example, yellow area (R and G) is applied to LoRA model 1 and 2. The range of values is 0 to 255, corresponding to a LoRA weight of 0 to 1.
 
 It can be combined with ControlNet.
 
-### Difference from Latent Couple extension and Composable LoRA
+| |without ControlNet|with ControlNet|
+|:----:|:----:|:----:|
+|no LoRA|<img src="https://user-images.githubusercontent.com/52813779/223676928-362a68f0-b4c4-4905-9a5f-6646a39341f7.png" width="256">|<img src="https://user-images.githubusercontent.com/52813779/223677042-a7989dc8-741f-4d45-8328-be1f0bf08194.png" width="256">|
+|with LoRA, no mask|<img src="https://user-images.githubusercontent.com/52813779/223677327-b4237ff9-1d36-4cd9-971b-a3434db6d0f9.png" width="256">|<img src="https://user-images.githubusercontent.com/52813779/223677380-ba74bca0-92c3-4c68-950f-0f96e439281e.png" width="256">|
+|with Lora, with mask|<img src="https://user-images.githubusercontent.com/52813779/223677475-dff082c1-2a41-4d46-982d-db9655eb8bc2.png" width="256">|<img src="https://user-images.githubusercontent.com/52813779/223677518-0ae042ed-3baf-47f0-b8ca-3dd6805f7c2f.png" width="256">|
+| |pose|mask|
+| |<img src="https://user-images.githubusercontent.com/52813779/223677653-cfd7fb36-afc1-49e8-9253-4bc01c5dad99.png" width="256">|<img src="https://user-images.githubusercontent.com/52813779/223677672-5e2fc729-01ee-4c62-8457-2e125bb0e24f.png" width="256">
+
+Sample images are generated with [wd-1-5-beta2-aesthetic-fp16.safetensors](https://huggingface.co/waifu-diffusion/wd-1-5-beta2) and three LoRAs: two chracter LoRAs (masked) and one style LoRA (not masked). Used ControlNet is [diff_control_wd15beta2_pose.safetensors](https://huggingface.co/furusu/ControlNet).
+
+### Difference from 'Latent Couple extension' and 'Composable LoRA'
 
 'Latent Couple extension' masks the output of U-Net for each sub-prompt (AND-separated prompts), while our implementation masks the output of LoRA at each layer of U-Net. The mask is resized according to the tensor shape of each layer, so the resolution is particularly coarse at the deeper layers.
 
-'Composable LoRA' controls the area via Latent Couple extension by switching LoRA on or off for each sub-prompt, but this implementation works alone.
+'Composable LoRA' controls the area via 'Latent Couple extension' by switching LoRA on or off for each sub-prompt, but this implementation works alone.
 
-This implementation does not work for all LoRA modules (LoRA modules associated with Text Encoder are not masked), and due to the coarse resolution, it is not possible to completely separate areas.
+This implementation does not work for all modules in LoRA (the modules associated with Text Encoder are not masked), and due to the coarse resolution, it is not possible to completely separate areas.
 
 ## この Web UI 拡張について
 
@@ -124,13 +136,17 @@ LoRAモデルをX/Y plotの値（選択対象）として使う場合は、カ�
 
 ![image](https://user-images.githubusercontent.com/52813779/212443781-1f4c442e-c2f3-47f8-b698-25fbe981f633.png)
 
-## LoRA の領域別適用
+## LoRA の領域別適用 __（実験的機能）__
 
 適用する領域をマスク画像で指定することで、それぞれの LoRA モデルを画像の指定した部分にのみ適用することができます。現在はモデル1~3の3つのみ領域指定可能です。
 
-マスク画像はカラーの画像で、RGBの各チャネルが LoRA モデル1~3に対応します。生成画像サイズにリサイズされて適用されます。
+マスク画像はカラーの画像で、RGBの各チャネルが LoRA モデル1から3に対応します。RGBの各チャネルは重ねることが可能です。たとえば黄色（RとGチャネル）の領域は、モデル1と2が有効になります。ピクセル値0から255がLoRAの適用率0から1に対応します（127なら重み0.5で適用するのと同じになります）。
 
-ControlNetと組み合わせることも可能です。
+マスク画像は生成画像サイズにリサイズされて適用されます。
+
+ControlNetと組み合わせることも可能です（細かい位置指定にはControlNetとの組み合わせを推奨します）。
+
+上のサンプルをご参照ください。
 
 ### Latent Couple extension、Composable LoRAとの違い
 
@@ -142,13 +158,13 @@ Composable LoRA はサブプロンプトごとに LoRA の適用有無を切り�
 
 ## Change History
 
-- 7 Mar 2023, 2023/3/7: Release v0.5.0
-  - Support current version of LoCon. Thank you very much KohakuBlueleaf for your help!
+- 8 Mar. 2023, 2023/3/8: Release v0.5.0
+  - Support current version of [LoCon](https://github.com/KohakuBlueleaf/LoCon). __Thank you very much KohakuBlueleaf for your help!__
     - LoCon will be enhanced in the future. Compatibility for future versions is not guaranteed.
   - Support dynamic LoRA: different dimensions (ranks) and alpha for each module.
   - Support LoRA for Conv2d (extended to conv2d with a kernel size not 1x1).
   - Add masked LoRA feature (experimental.)
-  - 現在のバージョンの LoCon をサポートしました。 KohakuBlueleaf 氏のご支援に深く感謝します。
+  - 現在のバージョンの [LoCon](https://github.com/KohakuBlueleaf/LoCon) をサポートしました。 KohakuBlueleaf 氏のご支援に深く感謝します。
     - LoCon が将来的に拡張された場合、それらのバージョンでの互換性は保証できません。
   - dynamic LoRA の機能を追加しました。各モジュールで異なる dimension (rank) や alpha を持つ LoRA が使えます。
   - Conv2d 拡張 LoRA をサポートしました。カーネルサイズが1x1でない Conv2d を対象とした LoRA が使えます。
