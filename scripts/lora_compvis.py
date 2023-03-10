@@ -34,9 +34,9 @@ class LoRAModule(torch.nn.Module):
       in_dim = org_module.in_channels
       out_dim = org_module.out_channels
 
-      self.lora_dim = min(self.lora_dim, in_dim, out_dim)
-      if self.lora_dim != lora_dim:
-        print(f"{lora_name} dim (rank) is changed to: {self.lora_dim}")
+      # self.lora_dim = min(self.lora_dim, in_dim, out_dim)
+      # if self.lora_dim != lora_dim:
+      #   print(f"{lora_name} dim (rank) is changed to: {self.lora_dim}")
 
       kernel_size = org_module.kernel_size
       stride = org_module.stride
@@ -128,7 +128,7 @@ def create_network_and_apply_compvis(du_state_dict, multiplier_tenc, multiplier_
 
     lora_name = key.split('.')[0]
     if 'alpha' in key:
-      modules_alpha[lora_name] = float(value.detach().cpu().numpy())
+      modules_alpha[lora_name] = float(value.detach().to(torch.float).cpu().numpy())
     elif 'lora_down' in key:
       dim = value.size()[0]
       modules_dim[lora_name] = dim
@@ -346,7 +346,7 @@ class LoRANetworkCompvis(torch.nn.Module):
               if '_resblocks_23_' in lora_name:                           # ignore last block in StabilityAi Text Encoder
                 break
               if lora_name not in comp_vis_loras_dim_alpha:
-                break
+                continue
 
               dim, alpha = comp_vis_loras_dim_alpha[lora_name]
               lora = LoRAModule(lora_name, child_module, multiplier, dim, alpha)
@@ -363,7 +363,7 @@ class LoRANetworkCompvis(torch.nn.Module):
 
                 lora_name = module_name + '_' + suffix
                 if lora_name not in comp_vis_loras_dim_alpha:
-                  break
+                  continue
                 dim, alpha = comp_vis_loras_dim_alpha[lora_name]
                 lora_info = LoRAInfo(lora_name, module_name, child_module, multiplier, dim, alpha)
                 loras.append(lora_info)

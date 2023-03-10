@@ -160,6 +160,13 @@ Composable LoRA はサブプロンプトごとに LoRA の適用有無を切り�
 
 ## Change History
 
+- 9 Mar. 2023, 2023/3/9: Release v0.5.1
+  - Fix the model saved with `bf16` causes an error. https://github.com/kohya-ss/sd-webui-additional-networks/issues/127
+  - Fix some Conv2d-3x3 LoRA modules are not effective. https://github.com/kohya-ss/sd-scripts/issues/275
+  - Fix LoRA modules with higher dim (rank) > 320 causes an error.
+  - `bf16` で学習されたモデルが読み込めない不具合を修正しました。 https://github.com/kohya-ss/sd-webui-additional-networks/issues/127
+  - いくつかの Conv2d-3x3 LoRA モジュールが有効にならない不具合を修正しました。 https://github.com/kohya-ss/sd-scripts/issues/275
+  - dim (rank) が 320 を超えるLoRAモデルが読み込めない不具合を修正しました。
 - 8 Mar. 2023, 2023/3/8: Release v0.5.0
   - Support current version of [LoCon](https://github.com/KohakuBlueleaf/LoCon). __Thank you very much KohakuBlueleaf for your help!__
     - LoCon will be enhanced in the future. Compatibility for future versions is not guaranteed.
