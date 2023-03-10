@@ -46,12 +46,12 @@ class LoRAModule(torch.nn.Module):
     else:
       in_dim = org_module.in_features
       out_dim = org_module.out_features
-      self.lora_down = torch.nn.Linear(in_dim, lora_dim, bias=False)
-      self.lora_up = torch.nn.Linear(lora_dim, out_dim, bias=False)
+      self.lora_down = torch.nn.Linear(in_dim, self.lora_dim, bias=False)
+      self.lora_up = torch.nn.Linear(self.lora_dim, out_dim, bias=False)
 
     if type(alpha) == torch.Tensor:
       alpha = alpha.detach().float().numpy()                              # without casting, bf16 causes error
-    alpha = lora_dim if alpha is None or alpha == 0 else alpha
+    alpha = self.lora_dim if alpha is None or alpha == 0 else alpha
     self.scale = alpha / self.lora_dim
     self.register_buffer('alpha', torch.tensor(alpha))                    # 定数として扱える
 
