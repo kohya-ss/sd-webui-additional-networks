@@ -309,6 +309,7 @@ def update_models():
   paths = [lora_models_dir]
   extra_lora_paths = util.split_path_list(shared.opts.data.get("additional_networks_extra_lora_path", ""))
   for path in extra_lora_paths:
+    path = path.lstrip()
     if os.path.isdir(path):
       paths.append(path)
 

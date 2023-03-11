@@ -160,6 +160,9 @@ Composable LoRA はサブプロンプトごとに LoRA の適用有無を切り�
 
 ## Change History
 
+- 11 Mar. 2023, 2023/3/11
+  - Leading spaces in each path in `Extra paths to scan for LoRA models` settings are ignored. Thanks to tsukimiya!
+  - 設定の `Extra paths to scan for LoRA models` の各ディレクトリ名の先頭スペースを無視するよう変更しました。tsukimiya氏に感謝します。
 - 9 Mar. 2023, 2023/3/9: Release v0.5.1
   - Fix the model saved with `bf16` causes an error. https://github.com/kohya-ss/sd-webui-additional-networks/issues/127
   - Fix some Conv2d-3x3 LoRA modules are not effective. https://github.com/kohya-ss/sd-scripts/issues/275
