@@ -46,6 +46,7 @@ class Script(scripts.Script):
     paste_params.clear()
 
     self.infotext_fields = []
+    self.paste_field_names = []
 
     with gr.Group():
       with gr.Accordion('Additional Networks', open=False):
@@ -98,6 +99,9 @@ class Script(scripts.Script):
               (weight_unet, f"AddNet Weight A {i+1}"),
               (weight_tenc, f"AddNet Weight B {i+1}"),
           ])
+
+        for _, field_name in self.infotext_fields:
+          self.paste_field_names.append(field_name)
 
         def update_weight_sliders(separate, *sliders):
           updates = []
