@@ -1,3 +1,5 @@
+import importlib
+import inspect
 import os
 
 import torch
@@ -11,10 +13,15 @@ import modules.ui
 
 from scripts import lora_compvis, model_util, metadata_editor, xyz_grid_support
 from scripts.model_util import lora_models, MAX_MODEL_COUNT
-
+from modules.script_callbacks import CFGDenoiserParams, cfg_denoiser_callback
+from modules.script_callbacks import CFGDenoisedParams, cfg_denoised_callback
 
 memo_symbol = "\U0001F4DD"  # 📝
 addnet_paste_params = {"txt2img": [], "img2img": []}
+
+# TODO load values from settings or script files in the folder
+network_modules = ["LoRA"]
+module_to_python_module_mappings = {"LoRA": "lora_compvis"}
 
 
 class Script(scripts.Script):
@@ -23,6 +30,7 @@ class Script(scripts.Script):
         self.latest_params = [(None, None, None, None)] * MAX_MODEL_COUNT
         self.latest_networks = []
         self.latest_model_hash = ""
+        self.has_mask = False
 
     def title(self):
         return "Additional networks for generating"
@@ -60,7 +68,7 @@ class Script(scripts.Script):
 
                 for i in range(MAX_MODEL_COUNT):
                     with gr.Row():
-                        module = gr.Dropdown(["LoRA"], label=f"Network module {i+1}", value="LoRA")
+                        module = gr.Dropdown(network_modules, label=f"Network module {i+1}", value="LoRA")
                         model = gr.Dropdown(list(lora_models.keys()), label=f"Model {i+1}", value="None")
                         with gr.Row(visible=False):
                             model_path = gr.Textbox(value="None", interactive=False, visible=False)
@@ -208,10 +216,22 @@ class Script(scripts.Script):
                     models_changed = True
                     break
 
+        mask_image = args[-2]
+        mask_exists = mask_image is not None
+        models_changed = models_changed or (mask_exists != self.has_mask)
+
         if models_changed:
             self.restore_networks(p.sd_model)
             self.latest_params = params
             self.latest_model_hash = p.sd_model.sd_model_hash
+
+            merge_weights = shared.opts.data.get("additional_networks_merge_weights", False)
+
+            # if `merge weights` option is off and no mask, old behavior
+            # TODO remove option in future
+            compatible_mode = not merge_weights and not mask_exists
+
+            merge_weights = merge_weights and not mask_exists  # if mask exists, do not merge
 
             for module, model, weight_unet, weight_tenc in self.latest_params:
                 if model is None or model == "None" or len(model) == 0:
@@ -230,47 +250,223 @@ class Script(scripts.Script):
                     print(f"file not found: {model_path}")
                     continue
 
+                py_module = importlib.import_module("scripts." + module_to_python_module_mappings[module])
                 print(f"{module} weight_unet: {weight_unet}, weight_tenc: {weight_tenc}, model: {model}")
-                if module == "LoRA":
-                    if os.path.splitext(model_path)[1] == ".safetensors":
-                        from safetensors.torch import load_file
 
-                        du_state_dict = load_file(model_path)
-                    else:
-                        du_state_dict = torch.load(model_path, map_location="cpu")
+                if os.path.splitext(model_path)[1] == ".safetensors":
+                    from safetensors.torch import load_file
 
+                    du_state_dict = load_file(model_path)
+                else:
+                    du_state_dict = torch.load(model_path, map_location="cpu")
+
+                if hasattr(py_module, "create_network"):
+                    # new version
+                    network = py_module.create_network(
+                        compatible_mode,
+                        du_state_dict,
+                        weight_tenc,
+                        weight_unet,
+                        text_encoder,
+                        unet,
+                        p.sd_model.device,
+                        p.sd_model.dtype,
+                    )
+                    merge_weights = merge_weights and network.weights_mergeable
+                else:
+                    # old hacked version
+                    merge_weights = False
+                    network.support_mask = False
                     network, info = lora_compvis.create_network_and_apply_compvis(
                         du_state_dict, weight_tenc, weight_unet, text_encoder, unet
                     )
                     # in medvram, device is different for u-net and sd_model, so use sd_model's
                     network.to(p.sd_model.device, dtype=p.sd_model.dtype)
+                    print(f"{module} model {model} loaded: {info}")
 
-                    print(f"LoRA model {model} loaded: {info}")
-                    self.latest_networks.append((network, model))
+                self.latest_networks.append((network, model))
+
             if len(self.latest_networks) > 0:
+                for network, model in self.latest_networks:
+                    if hasattr(network, "apply_to_compvis"):
+                        info = network.apply_to_compvis(merge_weights)
+                        print(f"model {model} loaded: {info}")
+
                 print("setting (or sd model) changed. new networks created.")
 
         # apply mask: currently only top 3 networks are supported
-        if len(self.latest_networks) > 0:
-            mask_image = args[-2]
-            if mask_image is not None:
-                mask_image = mask_image.astype(np.float32) / 255.0
-                print(f"use mask image to control LoRA regions.")
-                for i, (network, model) in enumerate(self.latest_networks[:3]):
-                    if not hasattr(network, "set_mask"):
-                        continue
-                    mask = mask_image[:, :, i]  # R,G,B
-                    if mask.max() <= 0:
-                        continue
-                    mask = torch.tensor(mask, dtype=p.sd_model.dtype, device=p.sd_model.device)
-                    network.set_mask(mask, height=p.height, width=p.width)
-                    print(f"apply mask. channel: {i}, model: {model}")
-            else:
-                for network, _ in self.latest_networks:
-                    if hasattr(network, "set_mask"):
-                        network.set_mask(None)
+        self.has_mask = False
+        if len(self.latest_networks) > 0 and mask_exists:
+            print(f"use mask image to control LoRA regions.")
+            self.has_mask = True
+            mask_image = mask_image.astype(np.float32) / 255.0
+
+            for i, (network, model) in enumerate(self.latest_networks):
+                if not network.support_mask:
+                    print(f"This model does not support regional mask: {model}")
+                    continue
+
+                mask = None
+                if i < 3:
+                    img_ch = mask_image[:, :, i]  # R,G,B
+                    if img_ch.max() > 0:
+                        mask = torch.tensor(img_ch, dtype=p.sd_model.dtype, device=p.sd_model.device)
+                if mask is None:
+                    # if mask is None, the network is applied to whole image
+                    mask = torch.ones((p.height // 8, p.width // 8), dtype=p.sd_model.dtype, device=p.sd_model.device)
+
+                network.set_mask(i, mask, height=p.height, width=p.width)
+                # if mask is not None:
+                print(f"apply mask and to subprompt. channel/subprompt: {i}, model: {model}")
+                # else:
+                #     print(f"apply to subprompt. subprompt: {i}, model: {model}")
+
+            if not shared.batch_cond_uncond:
+                print("this overrides `batch_cond_uncond` to True. To avoid OOM, set batch size to 1.")
+        else:
+            for i, (network, _) in enumerate(self.latest_networks):
+                if network.support_mask:
+                    network.set_mask(None, None)
 
         self.set_infotext_fields(p, self.latest_params)
+
+        if not hasattr(self, "callbacks_added"):
+            script_callbacks.on_cfg_denoiser(self.denoiser_callback)
+            script_callbacks.on_cfg_denoised(self.denoised_callback)
+            self.callbacks_added = True
+
+    def denoiser_callback(self, params: CFGDenoiserParams):
+        if not self.latest_networks or not self.has_mask:
+            return
+        if not hasattr(params, "text_uncond"):
+            print("Web UI may not be the latest version. Attention Couple and Reginal LoRA is not working.")
+            return
+        if params.text_uncond is None:  # no uncond?
+            return
+
+        self.org_batch_cond_uncond = shared.batch_cond_uncond
+        shared.batch_cond_uncond = True  # force batch cond/uncond
+
+        # x, image_cond, sigma, sampling_step, total_sampling_steps, text_cond, text_uncond
+        # x: sum(c+1),4,h,w       text_cond: sum(c),77*n,dim     text_uncond: b,77*n,dim
+        # print(params.x.size())
+        # print(params.image_cond.size())
+        # print(params.text_cond.size())
+        # print(params.text_uncond.size())
+        """
+        x
+            batch #1
+                subprompt #1
+                subprompt #2
+                subprompt #3
+                uncond
+            batch #2
+                subprompt #1
+                subprompt #2
+                subprompt #3
+                uncond
+        batch #1
+            subprompt #1
+            subprompt #2
+            subprompt #3
+        batch #2
+            subprompt #1
+            subprompt #2
+            subprompt #3
+        uncond
+            batch #1
+            batch #2
+        """
+        # print("cfg_denoiser_callback")
+        batch_size = params.text_uncond.size()[0]
+        num_sub_prompts = params.text_cond.size()[0] // batch_size
+
+        # set batch size and num of sub prompts to LoRA Networks (this is required only in first step)
+        for network, _ in self.latest_networks:
+            network.new_step_started(batch_size, num_sub_prompts)
+
+        # remove extra x and sigma: attention couple requires only two x per image, cond + uncond
+        nx = []
+        nsigma = []
+        for i in range(0, params.x.size()[0] - batch_size, num_sub_prompts):
+            nx.append(params.x[i])
+            nsigma.append(params.sigma[i])
+        for i in range(num_sub_prompts * batch_size, params.x.size()[0]):
+            nx.append(params.x[i])
+            nsigma.append(params.sigma[i])
+        params.x = torch.stack(nx)
+        params.sigma = torch.stack(nsigma)
+
+        # discard cond or uncond to same length: this limitation came from CrossAttention and ControlNet
+        cond = params.text_cond
+        uncond = params.text_uncond
+        cond_len = cond.size()[1]
+        uncond_len = uncond.size()[1]
+
+        if params.sampling_step == 0 and cond_len != uncond_len:
+            print(f"lengthes of cond and uncond are mismatch. longer one is discarded: {cond_len}/{uncond_len}")
+        if cond_len < uncond_len:
+            uncond = uncond[:, :cond_len]
+        elif cond_len > uncond_len:
+            cond = cond[:, :uncond_len]
+
+        # set cond and uncond for each network. network doesn't use given context
+        cond_uncond = torch.cat([cond, uncond])
+        for i, (network, _) in enumerate(self.latest_networks):
+            network.set_cond_uncond(cond_uncond)
+
+        # for ControlNet: use last cond
+        cond = params.text_cond[-1].unsqueeze(0)
+
+        params.text_cond = cond
+        params.text_uncond = uncond
+
+        # print("cfg_denoiser_callback end", params.x.size(), params.text_cond.size(), params.text_uncond.size())
+
+    def denoised_callback(self, params: CFGDenoisedParams):
+        if not self.latest_networks or not self.has_mask:
+            return
+
+        # (x, sampling_step, total_sampling_steps)
+        # print("cfg_denoised_callback")
+
+        # repeat again
+        batch_size = self.latest_networks[0][0].batch_size
+        num_sub_prompts = self.latest_networks[0][0].num_sub_prompts
+
+        # modification to params doesn't affect caller...
+        # nx = []
+        # for i in range(0, batch_size):
+        #     params.x[i] = params.x[i] / num_sub_prompts  # bacause added in next step
+        #     for _ in range(num_sub_prompts):
+        #        nx.append(params.x[i])
+        # for i in range(batch_size, params.x.size()[0]):
+        #     nx.append(params.x[i])
+        # params.x = torch.stack(nx)
+
+        # get conds_list from parent scope
+        curframe = inspect.currentframe()
+        calframe = inspect.getouterframes(curframe)
+        parframe = calframe[2]
+        par_locals = parframe[0].f_locals
+        conds_list = par_locals.get("conds_list", None)
+
+        if conds_list is not None:
+            # set all member to (i,1)
+            for i in range(len(conds_list)):
+                # conds = conds_list[i]
+                conds_list[i] = [(j, 1.0) for j in range(batch_size)]
+        else:
+            print("No 'conds_list' in the parent scope. Web UI might be different version.")
+
+        # substract extra uncond in advance
+        # params.x[0] -= params.x[-1]
+
+        # print(batch_size, num_sub_prompts, params.x.size(), params.sampling_step, params.total_sampling_steps)
+
+        if hasattr(self, "org_batch_cond_uncond"):
+            shared.batch_cond_uncond = self.org_batch_cond_uncond
+            del self.org_batch_cond_uncond
 
 
 def on_script_unloaded():
@@ -291,6 +487,9 @@ def on_ui_tabs():
 
 def on_ui_settings():
     section = ("additional_networks", "Additional Networks")
+    shared.opts.add_option(
+        "additional_networks_merge_weights", shared.OptionInfo(False, "Merge weights in advance", section=section)
+    )
     shared.opts.add_option(
         "additional_networks_extra_lora_path",
         shared.OptionInfo(
@@ -351,6 +550,9 @@ def on_ui_settings():
     shared.opts.add_option(
         "additional_networks_max_dataset_folders", shared.OptionInfo(20, "Max number of dataset folders to show", section=section)
     )
+    # shared.opts.add_option(
+    #     "additional_networks_additional_modules", shared.OptionInfo("", "Python modules to load", section=section)
+    # )
 
 
 def on_infotext_pasted(infotext, params):
