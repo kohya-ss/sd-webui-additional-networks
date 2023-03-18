@@ -160,6 +160,17 @@ ControlNetと組み合わせることも可能です（細かい位置指定に�
 - ~~バッチサイズ1しか動きません。~~ 動くようになりました。
 - プロンプトは、77トークン単位で、positive/negativeプロンプトの短いほうのトークン数に切り捨てられます。
 
+### Attention Couple 対応版の設定例
+
+サブプロンプトを4つ設定した例：
+![image](https://user-images.githubusercontent.com/52813779/226109301-6926a79d-d3f9-42c6-b597-5ff35f9c0ec7.png)
+
+LoRAも4つ指定する:
+![image](https://user-images.githubusercontent.com/52813779/226109315-73d54812-b39a-4466-9c8a-c92c89a53422.png)
+
+ControlNetの指定:
+![image](https://user-images.githubusercontent.com/52813779/226109328-d4a30f0c-0bc1-4290-ab76-f967510416c3.png)
+
 ### Latent Couple extension、Composable LoRAとの違い
 
 Latent Couple extension はサブプロンプト（ANDで区切られたプロンプト）ごとに、U-Net の出力をマスクしますが、当実装では U-Net の各層で LoRA の出力をマスクします。マスクは各層のテンソル形状に応じてリサイズされるため、深い層では特に解像度が粗くなります。
