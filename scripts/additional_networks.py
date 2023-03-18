@@ -380,6 +380,7 @@ class Script(scripts.Script):
         # print("cfg_denoiser_callback")
         batch_size = params.text_uncond.size()[0]
         num_sub_prompts = params.text_cond.size()[0] // batch_size
+        # print(batch_size, num_sub_prompts)
 
         # set batch size and num of sub prompts to LoRA Networks (this is required only in first step)
         for network, _ in self.latest_networks:
@@ -415,8 +416,8 @@ class Script(scripts.Script):
         for i, (network, _) in enumerate(self.latest_networks):
             network.set_cond_uncond(cond_uncond)
 
-        # for ControlNet: use last cond
-        cond = params.text_cond[-1].unsqueeze(0)
+        # for ControlNet: use last cond, and repeat batch_size times
+        cond = params.text_cond[-1].unsqueeze(0).repeat(batch_size, 1, 1)
 
         params.text_cond = cond
         params.text_uncond = uncond
@@ -444,6 +445,7 @@ class Script(scripts.Script):
         #     nx.append(params.x[i])
         # params.x = torch.stack(nx)
 
+        # so remove conds from conds_list to align the number of conds with params.x
         # get conds_list from parent scope
         curframe = inspect.currentframe()
         calframe = inspect.getouterframes(curframe)
@@ -455,7 +457,7 @@ class Script(scripts.Script):
             # set all member to (i,1)
             for i in range(len(conds_list)):
                 # conds = conds_list[i]
-                conds_list[i] = [(j, 1.0) for j in range(batch_size)]
+                conds_list[i] = [(i, 1.0) for _ in range(batch_size)]
         else:
             print("No 'conds_list' in the parent scope. Web UI might be different version.")
 
