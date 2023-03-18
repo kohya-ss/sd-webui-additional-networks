@@ -163,7 +163,7 @@ class LoRAModule(torch.nn.Module):
 
         if is_tail:
             x = x + lx
-            # speical postprocessing for to_q: repeat outputs for attention
+            # special postprocessing for to_q: repeat outputs for attention
             if self.is_unet and "attn2_to_q" in self.lora_name:
                 x = self.postp_to_q(x)
             return x

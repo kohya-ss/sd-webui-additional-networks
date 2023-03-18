@@ -406,7 +406,7 @@ class Script(scripts.Script):
         uncond_len = uncond.size()[1]
 
         if params.sampling_step == 0 and cond_len != uncond_len:
-            print(f"lengthes of cond and uncond are mismatch. longer one is discarded: {cond_len}/{uncond_len}")
+            print(f"lengths of cond and uncond are mismatch. longer one is discarded: {cond_len}/{uncond_len}")
         if cond_len < uncond_len:
             uncond = uncond[:, :cond_len]
         elif cond_len > uncond_len:
@@ -439,7 +439,7 @@ class Script(scripts.Script):
         # modification to params doesn't affect caller...
         # nx = []
         # for i in range(0, batch_size):
-        #     params.x[i] = params.x[i] / num_sub_prompts  # bacause added in next step
+        #     params.x[i] = params.x[i] / num_sub_prompts  # because added in next step
         #     for _ in range(num_sub_prompts):
         #        nx.append(params.x[i])
         # for i in range(batch_size, params.x.size()[0]):
@@ -462,7 +462,7 @@ class Script(scripts.Script):
         else:
             print("No 'conds_list' in the parent scope. Web UI might be different version.")
 
-        # substract extra uncond in advance
+        # subtract extra uncond in advance
         # params.x[0] -= params.x[-1]
 
         # print(batch_size, num_sub_prompts, params.x.size(), params.sampling_step, params.total_sampling_steps)
