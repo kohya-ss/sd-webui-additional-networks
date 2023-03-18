@@ -398,22 +398,20 @@ class Script(scripts.Script):
         params.x = torch.stack(nx)
         params.sigma = torch.stack(nsigma)
 
-        # pad cond or uncond to same length: this limitation came from sd_samplers_kdiffusion.py, CrossAttention and ControlNet
-        # It is required that cond and uncond to have same length for single batch
+        # discard cond or uncond to make them have same length: this limitation came from sd_samplers_kdiffusion.py, CrossAttention and ControlNet
+        # cond and uncond must have same length for single batch
         cond = params.text_cond
         uncond = params.text_uncond
         cond_len = cond.size()[1]
         uncond_len = uncond.size()[1]
 
+        if params.sampling_step == 0 and cond_len != uncond_len:
+            print(f"lengthes of cond and uncond are mismatch. longer one is discarded: {cond_len}/{uncond_len}")
         if cond_len < uncond_len:
-            # pad cond to same length as uncond
-            pad = torch.zeros((cond.size()[0], uncond_len - cond_len, cond.size()[2]), dtype=cond.dtype, device=cond.device)
-            cond = torch.cat([cond, pad], dim=1)
+            uncond = uncond[:, :cond_len]
         elif cond_len > uncond_len:
-            # pad uncond to same length as cond
-            pad = torch.zeros((uncond.size()[0], cond_len - uncond_len, uncond.size()[2]), dtype=uncond.dtype, device=uncond.device)
-            uncond = torch.cat([uncond, pad], dim=1)
-
+            cond = cond[:, :uncond_len]
+            
         # set cond and uncond for each network. network doesn't use given context
         cond_uncond = torch.cat([cond, uncond])
         for i, (network, _) in enumerate(self.latest_networks):
