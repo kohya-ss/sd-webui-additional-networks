@@ -1,4 +1,3 @@
-import importlib
 import inspect
 import os
 
@@ -250,7 +249,7 @@ class Script(scripts.Script):
                     print(f"file not found: {model_path}")
                     continue
 
-                py_module = importlib.import_module("scripts." + module_to_python_module_mappings[module])
+                # py_module = importlib.import_module("scripts." + module_to_python_module_mappings[module])
                 print(f"{module} weight_unet: {weight_unet}, weight_tenc: {weight_tenc}, model: {model}")
 
                 if os.path.splitext(model_path)[1] == ".safetensors":
@@ -260,9 +259,9 @@ class Script(scripts.Script):
                 else:
                     du_state_dict = torch.load(model_path, map_location="cpu")
 
-                if hasattr(py_module, "create_network"):
+                if hasattr(lora_compvis, "create_network"):
                     # new version
-                    network = py_module.create_network(
+                    network = lora_compvis.create_network(
                         compatible_mode,
                         du_state_dict,
                         weight_tenc,
