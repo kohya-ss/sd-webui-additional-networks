@@ -380,7 +380,7 @@ def setup_ui(addnet_paste_params):
             with gr.Row():
               gr.HTML(f"Send to {tabname}:")
               for i in range(MAX_MODEL_COUNT):
-                send_to_button = gr.Button(value=keycap_symbols[i], elem_id=f"additional_networks_send_to_{tabname}_{i}")
+                send_to_button = ToolButton(value=keycap_symbols[i], elem_id=f"additional_networks_send_to_{tabname}_{i}")
                 send_to_button.click(fn=lambda modu, mod: (modu, model_util.find_closest_lora_model_name(mod) or "None"), inputs=[module, model], outputs=[addnet_paste_params[tabname][i]["module"], addnet_paste_params[tabname][i]["model"]])
                 send_to_button.click(fn=None,_js=f"addnet_switch_to_{tabname}", inputs=None, outputs=None)
 

@@ -7,17 +7,3 @@
     max-height: 480px !important;
     min-height: 480px !important;
 }
-
-[id^=additional_networks_send_to_] {
-    display: flex;
-    align-content: center;
-    justify-content: center;
-    max-width: 2.5em;
-    min-width: 2.5em;
-    height: 2.4em;
-}
-
-
-[id^=additional_networks_send_to_metadata_editor_] {
-    transform: translateY(25%);
-}
