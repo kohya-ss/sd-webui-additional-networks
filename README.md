@@ -160,6 +160,11 @@ Composable LoRA はサブプロンプトごとに LoRA の適用有無を切り�
 
 ## Change History
 
+- 28 Mar. 2023, 2023/3/28
+  - Fix style for Gradio 3.22. Thanks to space-nuko!
+  - Please update Web UI to the latest version.
+  - Gradio 3.22 のスタイルに対応しました。space-nuko氏に感謝します。
+  - Web UIを最新版に更新願います。
 - 11 Mar. 2023, 2023/3/11
   - Leading spaces in each path in `Extra paths to scan for LoRA models` settings are ignored. Thanks to tsukimiya!
   - 設定の `Extra paths to scan for LoRA models` の各ディレクトリ名の先頭スペースを無視するよう変更しました。tsukimiya氏に感謝します。
