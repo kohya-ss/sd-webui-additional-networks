@@ -921,7 +921,11 @@ class LoRANetworkCompvis(torch.nn.Module):
             lora_idx_info_to_out = lora_dic[module_name + "_out_proj"]
 
             # check MHA is already replaced
-            if module.forward.__qualname__.split(".")[0] == "MultiheadAttention":
+            # original torch.nn.MultiheadAttention or Web UI's replaced lora_MultiheadAttention_forward
+            if (
+                module.forward.__qualname__.split(".")[0] == "MultiheadAttention"
+                or module.forward.__qualname__ == "lora_MultiheadAttention_forward"
+            ):
                 # print(f"replace MultiheadAttention for {lora_info.lora_name}")
 
                 # corresponding LoRA module exists, create dummy MHA
