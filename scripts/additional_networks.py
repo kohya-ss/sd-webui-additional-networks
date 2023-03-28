@@ -76,82 +76,82 @@ class Script(scripts.Script):
             model_info = ToolButton(value=memo_symbol, elem_id=f"additional_networks_send_to_metadata_editor_{i}")
             model_info.click(fn=None, _js="addnet_send_to_metadata_editor", inputs=[module, model_path], outputs=[])
 
-                        module.change(
-                            lambda module, model, i=i: xyz_grid_support.update_axis_params(i, module, model),
-                            inputs=[module, model],
-                            outputs=[],
-                        )
-                        model.change(
-                            lambda module, model, i=i: xyz_grid_support.update_axis_params(i, module, model),
-                            inputs=[module, model],
-                            outputs=[],
-                        )
+            module.change(
+                lambda module, model, i=i: xyz_grid_support.update_axis_params(i, module, model),
+                inputs=[module, model],
+                outputs=[],
+            )
+            model.change(
+                lambda module, model, i=i: xyz_grid_support.update_axis_params(i, module, model),
+                inputs=[module, model],
+                outputs=[],
+            )
 
-                        # perhaps there is no user to train Text Encoder only, Weight A is U-Net
-                        # The name of label will be changed in future (Weight A and B), but UNet and TEnc for now for easy understanding
-                        with gr.Column() as col:
-                            weight = gr.Slider(label=f"Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=0.05, visible=True)
-                            weight_unet = gr.Slider(
-                                label=f"UNet Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=0.05, visible=False
-                            )
-                            weight_tenc = gr.Slider(
-                                label=f"TEnc Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=0.05, visible=False
-                            )
+            # perhaps there is no user to train Text Encoder only, Weight A is U-Net
+            # The name of label will be changed in future (Weight A and B), but UNet and TEnc for now for easy understanding
+            with gr.Column() as col:
+                weight = gr.Slider(label=f"Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=0.05, visible=True)
+                weight_unet = gr.Slider(
+                    label=f"UNet Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=0.05, visible=False
+                )
+                weight_tenc = gr.Slider(
+                    label=f"TEnc Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=0.05, visible=False
+                )
 
-                        weight.change(lambda w: (w, w), inputs=[weight], outputs=[weight_unet, weight_tenc])
-                        paste_params.append({"module": module, "model": model})
+            weight.change(lambda w: (w, w), inputs=[weight], outputs=[weight_unet, weight_tenc])
+            paste_params.append({"module": module, "model": model})
 
-                    ctrls.extend((module, model, weight_unet, weight_tenc))
-                    weight_sliders.extend((weight, weight_unet, weight_tenc))
-                    model_dropdowns.append(model)
+            ctrls.extend((module, model, weight_unet, weight_tenc))
+            weight_sliders.extend((weight, weight_unet, weight_tenc))
+            model_dropdowns.append(model)
 
-                    self.infotext_fields.extend(
-                        [
-                            (module, f"AddNet Module {i+1}"),
-                            (model, f"AddNet Model {i+1}"),
-                            (weight, f"AddNet Weight {i+1}"),
-                            (weight_unet, f"AddNet Weight A {i+1}"),
-                            (weight_tenc, f"AddNet Weight B {i+1}"),
-                        ]
-                    )
+        self.infotext_fields.extend(
+            [
+                (module, f"AddNet Module {i+1}"),
+                (model, f"AddNet Model {i+1}"),
+                (weight, f"AddNet Weight {i+1}"),
+                (weight_unet, f"AddNet Weight A {i+1}"),
+                (weight_tenc, f"AddNet Weight B {i+1}"),
+            ]
+        )
 
-                for _, field_name in self.infotext_fields:
-                    self.paste_field_names.append(field_name)
+        for _, field_name in self.infotext_fields:
+            self.paste_field_names.append(field_name)
 
-                def update_weight_sliders(separate, *sliders):
-                    updates = []
-                    for w, w_unet, w_tenc in zip(*(iter(sliders),) * 3):
-                        if not separate:
-                            w_unet = w
-                            w_tenc = w
-                        updates.append(gr.Slider.update(visible=not separate))  # Combined
-                        updates.append(gr.Slider.update(visible=separate, value=w_unet))  # UNet
-                        updates.append(gr.Slider.update(visible=separate, value=w_tenc))  # TEnc
-                    return updates
+        def update_weight_sliders(separate, *sliders):
+            updates = []
+            for w, w_unet, w_tenc in zip(*(iter(sliders),) * 3):
+                if not separate:
+                    w_unet = w
+                    w_tenc = w
+                updates.append(gr.Slider.update(visible=not separate))  # Combined
+                updates.append(gr.Slider.update(visible=separate, value=w_unet))  # UNet
+                updates.append(gr.Slider.update(visible=separate, value=w_tenc))  # TEnc
+            return updates
 
-                separate_weights.change(update_weight_sliders, inputs=[separate_weights] + weight_sliders, outputs=weight_sliders)
+        separate_weights.change(update_weight_sliders, inputs=[separate_weights] + weight_sliders, outputs=weight_sliders)
 
-                def refresh_all_models(*dropdowns):
-                    model_util.update_models()
-                    updates = []
-                    for dd in dropdowns:
-                        if dd in lora_models:
-                            selected = dd
-                        else:
-                            selected = "None"
-                        update = gr.Dropdown.update(value=selected, choices=list(lora_models.keys()))
-                        updates.append(update)
-                    return updates
+        def refresh_all_models(*dropdowns):
+            model_util.update_models()
+            updates = []
+            for dd in dropdowns:
+                if dd in lora_models:
+                    selected = dd
+                else:
+                    selected = "None"
+                update = gr.Dropdown.update(value=selected, choices=list(lora_models.keys()))
+                updates.append(update)
+            return updates
 
-                # mask for regions
-                with gr.Accordion("Extra args", open=False):
-                    with gr.Row():
-                        mask_image = gr.Image(label="mask image:")
-                        ctrls.append(mask_image)
+        # mask for regions
+        with gr.Accordion("Extra args", open=False):
+            with gr.Row():
+                mask_image = gr.Image(label="mask image:")
+                ctrls.append(mask_image)
 
-                refresh_models = gr.Button(value="Refresh models")
-                refresh_models.click(refresh_all_models, inputs=model_dropdowns, outputs=model_dropdowns)
-                ctrls.append(refresh_models)
+        refresh_models = gr.Button(value="Refresh models")
+        refresh_models.click(refresh_all_models, inputs=model_dropdowns, outputs=model_dropdowns)
+        ctrls.append(refresh_models)
 
         return ctrls
 
