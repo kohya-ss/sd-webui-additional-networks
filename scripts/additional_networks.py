@@ -9,6 +9,7 @@ from modules import shared, script_callbacks
 import gradio as gr
 
 import modules.ui
+from modules.ui_components import ToolButton, FormRow
 
 from scripts import lora_compvis, model_util, metadata_editor, xyz_grid_support
 from scripts.model_util import lora_models, MAX_MODEL_COUNT
@@ -66,8 +67,8 @@ class Script(scripts.Script):
                     self.infotext_fields.append((separate_weights, "AddNet Separate Weights"))
 
                 for i in range(MAX_MODEL_COUNT):
-                    with gr.Row():
-                        module = gr.Dropdown(network_modules, label=f"Network module {i+1}", value="LoRA")
+                    with FormRow(variant="compact"):
+                        module = gr.Dropdown(["LoRA"], label=f"Network module {i+1}", value="LoRA")
                         model = gr.Dropdown(list(lora_models.keys()), label=f"Model {i+1}", value="None")
                         with gr.Row(visible=False):
                             model_path = gr.Textbox(value="None", interactive=False, visible=False)
@@ -81,7 +82,7 @@ class Script(scripts.Script):
                         # gradio since this button will exit the gr.Blocks context by the
                         # time the metadata editor tab is created, so event handlers can't
                         # be registered on it by then.
-                        model_info = gr.Button(value=memo_symbol, elem_id=f"additional_networks_send_to_metadata_editor_{i}")
+                        model_info = ToolButton(value=memo_symbol, elem_id=f"additional_networks_send_to_metadata_editor_{i}")
                         model_info.click(fn=None, _js="addnet_send_to_metadata_editor", inputs=[module, model_path], outputs=[])
 
                         module.change(
