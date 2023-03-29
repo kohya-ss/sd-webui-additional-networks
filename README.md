@@ -160,6 +160,9 @@ Composable LoRA はサブプロンプトごとに LoRA の適用有無を切り�
 
 ## Change History
 
+- 30 Mar. 2023, 2023/3/30
+- Fix an issue where the `Save Metadata` button in the metadata editor does not work even if `Editing Enabled` is checked.
+  - メタデータエディタで `Save Metadata` ボタンが `Editing Enabled` をチェックしても有効にならない不具合を修正しました。
 - 28 Mar. 2023, 2023/3/28
   - Fix style for Gradio 3.22. Thanks to space-nuko!
   - Please update Web UI to the latest version.

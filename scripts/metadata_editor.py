@@ -469,8 +469,9 @@ def setup_ui(addnet_paste_params):
     updates = [gr.Textbox.update(interactive=enabled)] * 6
     updates.append(gr.Image.update(interactive=enabled))
     updates.append(gr.Slider.update(interactive=enabled))
+    updates.append(gr.Button.update(interactive=enabled))
     return updates
-  editing_enabled.change(fn=update_editing, inputs=[editing_enabled], outputs=[display_name, author, source, keywords, description, tags, cover_image, rating])
+  editing_enabled.change(fn=update_editing, inputs=[editing_enabled], outputs=[display_name, author, source, keywords, description, tags, cover_image, rating, save_metadata_button])
 
   cover_image.change(fn=modules.extras.run_pnginfo, inputs=[cover_image], outputs=[info1, img_file_info, info2])
 
