@@ -64,6 +64,7 @@ class LoRAModule(torch.nn.Module):
         self.org_module = org_module  # remove in applying
         self.mask_dic = None
         self.mask = None
+        self.mask_area = -1
 
     def apply_to(self):
         self.org_forward = self.org_module.forward
@@ -94,18 +95,19 @@ class LoRAModule(torch.nn.Module):
         # calculate lora and get size
         lx = self.lora_up(self.lora_down(x))
 
-        if self.mask is None:
-            if len(lx.size()) == 4:  # b,c,h,w
-                area = lx.size()[2] * lx.size()[3]
-            else:
-                area = lx.size()[1]  # b,seq,dim
+        if len(lx.size()) == 4:  # b,c,h,w
+            area = lx.size()[2] * lx.size()[3]
+        else:
+            area = lx.size()[1]  # b,seq,dim
 
+        if self.mask is None or self.mask_area != area:
             # get mask
             # print(self.lora_name, x.size(), lx.size(), area)
             mask = self.mask_dic[area]
             if len(lx.size()) == 3:
                 mask = torch.reshape(mask, (1, -1, 1))
             self.mask = mask
+            self.mask_area = area
 
         return self.org_forward(x) + lx * self.multiplier * self.scale * self.mask
 
@@ -581,7 +583,7 @@ class LoRANetworkCompvis(torch.nn.Module):
 
         return state_dict
 
-    def set_mask(self, mask, height=None, width=None):
+    def set_mask(self, mask, height=None, width=None, hr_height=None, hr_width=None):
         if mask is None:
             # clear latest mask
             # print("clear mask")
@@ -594,12 +596,12 @@ class LoRANetworkCompvis(torch.nn.Module):
         if (
             self.latest_mask_info is not None
             and torch.equal(mask, self.latest_mask_info[0])
-            and (height, width) == self.latest_mask_info[1:]
+            and (height, width, hr_height, hr_width) == self.latest_mask_info[1:]
         ):
             # print("mask not changed")
             return
 
-        self.latest_mask_info = (mask, height, width)
+        self.latest_mask_info = (mask, height, width, hr_height, hr_width)
 
         org_dtype = mask.dtype
         if mask.dtype == torch.bfloat16:
@@ -614,14 +616,15 @@ class LoRANetworkCompvis(torch.nn.Module):
             m = m.to(org_dtype)
             mask_dic[mh * mw] = m
 
-        h = height // 8
-        w = width // 8
-        for i in range(4):
-            resize_add(h, w)
-            if h % 2 == 1 or w % 2 == 1:  # add extra shape if h/w is not divisible by 2
-                resize_add(h + h % 2, w + w % 2)
-            h = (h + 1) // 2
-            w = (w + 1) // 2
+        for h, w in [(height, width), (hr_height, hr_width)]:
+            h = h // 8
+            w = w // 8
+            for i in range(4):
+                resize_add(h, w)
+                if h % 2 == 1 or w % 2 == 1:  # add extra shape if h/w is not divisible by 2
+                    resize_add(h + h % 2, w + w % 2)
+                h = (h + 1) // 2
+                w = (w + 1) // 2
 
         for lora in self.unet_loras:
             lora.set_mask_dic(mask_dic)

@@ -264,7 +264,8 @@ class Script(scripts.Script):
                     if mask.max() <= 0:
                         continue
                     mask = torch.tensor(mask, dtype=p.sd_model.dtype, device=p.sd_model.device)
-                    network.set_mask(mask, height=p.height, width=p.width)
+
+                    network.set_mask(mask, height=p.height, width=p.width, hr_height=p.hr_upscale_to_y, hr_width=p.hr_upscale_to_x)
                     print(f"apply mask. channel: {i}, model: {model}")
             else:
                 for network, _ in self.latest_networks:
