@@ -426,7 +426,7 @@ class Script(scripts.Script):
         uncond_len = uncond.size()[1]
 
         if params.sampling_step == 0 and cond_len != uncond_len:
-            print(f"lengths of cond and uncond are mismatch. longer one is discarded: {cond_len}/{uncond_len}")
+            print(f"lengths of cond and uncond are mismatch. shorter one is padded: {cond_len}/{uncond_len}")
         if cond_len < uncond_len:
             cond = torch.cat(
                 [cond, torch.zeros((cond.size()[0], uncond_len - cond_len, cond.size()[2]), dtype=cond.dtype, device=cond.device)],
