@@ -10,7 +10,7 @@ import gradio as gr
 import modules.ui
 from modules.ui_components import ToolButton, FormRow
 
-from scripts import lora_compvis, model_util, metadata_editor, xyz_grid_support
+from scripts import addnet_xyz_grid_support, lora_compvis, model_util, metadata_editor
 from scripts.model_util import lora_models, MAX_MODEL_COUNT
 
 
@@ -79,12 +79,12 @@ class Script(scripts.Script):
                         model_info.click(fn=None, _js="addnet_send_to_metadata_editor", inputs=[module, model_path], outputs=[])
 
                         module.change(
-                            lambda module, model, i=i: xyz_grid_support.update_axis_params(i, module, model),
+                            lambda module, model, i=i: addnet_xyz_grid_support.update_axis_params(i, module, model),
                             inputs=[module, model],
                             outputs=[],
                         )
                         model.change(
-                            lambda module, model, i=i: xyz_grid_support.update_axis_params(i, module, model),
+                            lambda module, model, i=i: addnet_xyz_grid_support.update_axis_params(i, module, model),
                             inputs=[module, model],
                             outputs=[],
                         )
@@ -386,10 +386,10 @@ def on_infotext_pasted(infotext, params):
         # Convert potential legacy name/hash to new format
         params[f"AddNet Model {i+1}"] = str(model_util.find_closest_lora_model_name(params[f"AddNet Model {i+1}"]))
 
-        xyz_grid_support.update_axis_params(i, params[f"AddNet Module {i+1}"], params[f"AddNet Model {i+1}"])
+        addnet_xyz_grid_support.update_axis_params(i, params[f"AddNet Module {i+1}"], params[f"AddNet Model {i+1}"])
 
 
-xyz_grid_support.initialize(Script)
+addnet_xyz_grid_support.initialize(Script)
 
 
 script_callbacks.on_script_unloaded(on_script_unloaded)
