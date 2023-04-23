@@ -81,13 +81,14 @@ class LoRAChainContainer:
     Container for LoRAChain. Holds global information such as mask, batch size, current step, etc.
     """
 
-    def __init__(self):
+    def __init__(self, will_be_merged=False):
         self.loras_chains: Dict[str, LoRAChain] = {}
         self.mask_dic: List[Dict[int, torch.Tensor]] = None
         self.mask_enabled = False
+        self.will_be_merged = will_be_merged
 
     def add_chain(self, first_in_text_encoder, lora_name: str, is_text_encoder: bool, module: torch.nn.Module):
-        lora_chain = LoRAChain(self, first_in_text_encoder, lora_name, module, is_text_encoder)
+        lora_chain = LoRAChain(self, first_in_text_encoder, lora_name, module, is_text_encoder, self.will_be_merged)
         self.loras_chains[lora_name] = lora_chain
 
     def get_module(self, lora_name: str):
@@ -164,7 +165,7 @@ class LoRAChain:
     """
 
     def __init__(
-        self, container: LoRAChainContainer, first_in_text_encoder: bool, lora_name: str, module: torch.nn.Module, is_text_encoder
+        self, container: LoRAChainContainer, first_in_text_encoder: bool, lora_name: str, module: torch.nn.Module, is_text_encoder, will_be_merged=False
     ):
         self.container = container
         self.first_lora_in_text_encoder = first_in_text_encoder
@@ -173,8 +174,9 @@ class LoRAChain:
         self.is_text_encoder = is_text_encoder
         self.loras: List[LoRAModule] = []
 
-        self.org_forward = module.forward
-        module.forward = self.forward
+        if not will_be_merged:
+            self.org_forward = module.forward
+            module.forward = self.forward
 
         # check regional or not by lora_name
         if self.is_text_encoder:
@@ -764,7 +766,7 @@ class LoRANetworkCompvis(torch.nn.Module):
             target_modules.append((True, mha_attn_rep.to_v, name + ".v_proj"))
             target_modules.append((True, mha_attn_rep.to_out, name + ".out_proj"))
 
-        lora_chains = LoRAChainContainer()
+        lora_chains = LoRAChainContainer(merge_weights)
         first_in_text_encoder = True
         for is_text_encoder, module, name in target_modules:
             prefix = LoRANetworkCompvis.LORA_PREFIX_TEXT_ENCODER if is_text_encoder else LoRANetworkCompvis.LORA_PREFIX_UNET
