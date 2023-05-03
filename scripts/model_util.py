@@ -82,7 +82,7 @@ def get_model_list(module, model, model_dir, sort_by):
         return []
 
     found, _ = get_all_models([model_dir], sort_by, "")
-    return found.keys()
+    return list(found.keys()) # convert dict_keys to list
 
 
 def traverse_all_files(curr_path, model_list):
