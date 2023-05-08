@@ -158,6 +158,12 @@ Composable LoRA はサブプロンプトごとに LoRA の適用有無を切り�
 
 ## Change History
 
+- 8 May 2023, 2023/5/8
+  - Fix an issue where the models are not loaded correctly in the `Additional Networks` tab.
+  - Fix an issue where `None` cannot be selected as a model in X/Y/Z plot.
+  - `Additional Networks`タブでモデルが正しく読み込まれない不具合を修正しました。
+  - X/Y/Z plotでモデルに `None` が選択できない不具合を修正しました。
+
 - 3 May 2023, 2023/5/3
   - Fix an issue where an error occurs when selecting a model in X/Y/Z plot.
   - X/Y/Z plotでモデル選択時にエラーとなる不具合を修正しました。
