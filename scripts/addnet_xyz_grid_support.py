@@ -68,7 +68,7 @@ def get_axis_model_choices(i):
     if module == "LoRA":
         if model != "None":
             sort_by = shared.opts.data.get("additional_networks_sort_models_by", "name")
-            return model_util.get_model_list(module, model, "", sort_by)
+            return ["None"] + model_util.get_model_list(module, model, "", sort_by)
 
     return [f"select `Model {i+1}` in `Additional Networks`. models in same folder for selected one will be shown here."]
 
