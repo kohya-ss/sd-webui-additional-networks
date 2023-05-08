@@ -372,11 +372,17 @@ model_name_filter = ""
 
 
 def get_filtered_model_paths(s):
+    # newer Gradio seems to show None in the list?
+    # if not s:
+    #     return ["None"] + list(model_util.lora_models.values())
+    # return ["None"] + [v for v in model_util.lora_models.values() if v and s in v.lower()]
     if not s:
-        return ["None"] + list(model_util.lora_models.values())
-
-    return ["None"] + [v for v in model_util.lora_models.values() if v and s in v.lower()]
-
+        l =  list(model_util.lora_models.values())
+    else:
+        l =  [v for v in model_util.lora_models.values() if v and s in v.lower()]
+    l = [v for v in l if v]     # remove None
+    l = ["None"] + l
+    return l
 
 def get_filtered_model_paths_global():
     global model_name_filter
