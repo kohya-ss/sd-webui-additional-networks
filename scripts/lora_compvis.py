@@ -617,6 +617,9 @@ class LoRANetworkCompvis(torch.nn.Module):
             mask_dic[mh * mw] = m
 
         for h, w in [(height, width), (hr_height, hr_width)]:
+            if not h or not w:
+                continue
+
             h = h // 8
             w = w // 8
             for i in range(4):
