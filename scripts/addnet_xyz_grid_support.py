@@ -48,29 +48,29 @@ LORA_TRAIN_METADATA_NAMES = {
     "ss_reg_dataset_dirs": "Reg dataset dirs.",
     "ss_sd_model_name": "SD model name",
     "ss_vae_name": "VAE name",
-    "ss_training_comment": "Comment"
+    "ss_training_comment": "Comment",
 }
 
 
-xy_grid = None # XY Grid module
-script_class = None # additional_networks scripts.Script class
+xy_grid = None  # XY Grid module
+script_class = None  # additional_networks scripts.Script class
 axis_params = [{}] * MAX_MODEL_COUNT
 
 
 def update_axis_params(i, module, model):
-  axis_params[i] = {"module": module, "model": model}
+    axis_params[i] = {"module": module, "model": model}
 
 
 def get_axis_model_choices(i):
-  module = axis_params[i].get("module", "None")
-  model = axis_params[i].get("model", "None")
+    module = axis_params[i].get("module", "None")
+    model = axis_params[i].get("model", "None")
 
-  if module == "LoRA":
-    if model != "None":
-      sort_by = shared.opts.data.get("additional_networks_sort_models_by", "name")
-      return model_util.get_model_list(module, model, "", sort_by)
+    if module == "LoRA":
+        if model != "None":
+            sort_by = shared.opts.data.get("additional_networks_sort_models_by", "name")
+            return ["None"] + model_util.get_model_list(module, model, "", sort_by)
 
-  return [f"select `Model {i+1}` in `Additional Networks`. models in same folder for selected one will be shown here."]
+    return [f"select `Model {i+1}` in `Additional Networks`. models in same folder for selected one will be shown here."]
 
 
 def update_script_args(p, value, arg_idx):
@@ -93,7 +93,7 @@ def confirm_models(p, xs):
 
 
 def apply_module(p, x, xs, i):
-    update_script_args(p, True, 0)       # set Enabled to True
+    update_script_args(p, True, 0)  # set Enabled to True
     update_script_args(p, x, 2 + 4 * i)  # enabled, separate_weights, ({module}, model, weight_unet, weight_tenc), ...
 
 
@@ -105,7 +105,7 @@ def apply_model(p, x, xs, i):
 
 def apply_weight(p, x, xs, i):
     update_script_args(p, True, 0)
-    update_script_args(p, x, 4 + 4 * i ) # enabled, separate_weights, (module, model, {weight_unet, weight_tenc}), ...
+    update_script_args(p, x, 4 + 4 * i)  # enabled, separate_weights, (module, model, {weight_unet, weight_tenc}), ...
     update_script_args(p, x, 5 + 4 * i)
 
 
@@ -153,8 +153,37 @@ def initialize(script):
         if os.path.basename(scriptDataTuple.path) == "xy_grid.py" or os.path.basename(scriptDataTuple.path) == "xyz_grid.py":
             xy_grid = scriptDataTuple.module
             for i in range(MAX_MODEL_COUNT):
-               model = xy_grid.AxisOption(f"AddNet Model {i+1}", str, lambda p, x, xs, i=i: apply_model(p, x, xs, i), format_lora_model, confirm_models, cost=0.5, choices=lambda i=i: get_axis_model_choices(i))
-               weight = xy_grid.AxisOption(f"AddNet Weight {i+1}", float, lambda p, x, xs, i=i: apply_weight(p, x, xs, i), xy_grid.format_value_add_label, None, cost=0.5)
-               weight_unet = xy_grid.AxisOption(f"AddNet UNet Weight {i+1}", float, lambda p, x, xs, i=i: apply_weight_unet(p, x, xs, i), xy_grid.format_value_add_label, None, cost=0.5)
-               weight_tenc = xy_grid.AxisOption(f"AddNet TEnc Weight {i+1}", float, lambda p, x, xs, i=i: apply_weight_tenc(p, x, xs, i), xy_grid.format_value_add_label, None, cost=0.5)
-               xy_grid.axis_options.extend([model, weight, weight_unet, weight_tenc])
+                model = xy_grid.AxisOption(
+                    f"AddNet Model {i+1}",
+                    str,
+                    lambda p, x, xs, i=i: apply_model(p, x, xs, i),
+                    format_lora_model,
+                    confirm_models,
+                    cost=0.5,
+                    choices=lambda i=i: get_axis_model_choices(i),
+                )
+                weight = xy_grid.AxisOption(
+                    f"AddNet Weight {i+1}",
+                    float,
+                    lambda p, x, xs, i=i: apply_weight(p, x, xs, i),
+                    xy_grid.format_value_add_label,
+                    None,
+                    cost=0.5,
+                )
+                weight_unet = xy_grid.AxisOption(
+                    f"AddNet UNet Weight {i+1}",
+                    float,
+                    lambda p, x, xs, i=i: apply_weight_unet(p, x, xs, i),
+                    xy_grid.format_value_add_label,
+                    None,
+                    cost=0.5,
+                )
+                weight_tenc = xy_grid.AxisOption(
+                    f"AddNet TEnc Weight {i+1}",
+                    float,
+                    lambda p, x, xs, i=i: apply_weight_tenc(p, x, xs, i),
+                    xy_grid.format_value_add_label,
+                    None,
+                    cost=0.5,
+                )
+                xy_grid.axis_options.extend([model, weight, weight_unet, weight_tenc])

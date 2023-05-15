@@ -5,9 +5,7 @@
 [__Change History__](#change-history) is moved to the bottom of the page.
 更新履歴は[ページ末尾](#change-history)に移しました。
 
-__Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts``__ (SD 1.x based only, except Conv2d-3x3 LoRA).  Thank you for great work!!!
-
-Update: Support current version of [LoCon](https://github.com/KohakuBlueleaf/LoCon). __Thank you very much KohakuBlueleaf for your help!__
+Stable Diffusion web UI now seems to support LoRA trained by ``sd-scripts`` Thank you for great work!!!
 
 
 ## About
@@ -185,6 +183,15 @@ Composable LoRA はサブプロンプトごとに LoRA の適用有無を切り�
 
 ## Change History
 
+- 8 May 2023, 2023/5/8
+  - Fix an issue where the models are not loaded correctly in the `Additional Networks` tab.
+  - Fix an issue where `None` cannot be selected as a model in X/Y/Z plot.
+  - `Additional Networks`タブでモデルが正しく読み込まれない不具合を修正しました。
+  - X/Y/Z plotでモデルに `None` が選択できない不具合を修正しました。
+
+- 3 May 2023, 2023/5/3
+  - Fix an issue where an error occurs when selecting a model in X/Y/Z plot.
+  - X/Y/Z plotでモデル選択時にエラーとなる不具合を修正しました。
 - 6 Apr. 2023, 2023/4/6
   - Fix an issue where the `Hires. fix` does not work with mask.
   - 領域別LoRAでHires. fixが動作しない不具合を修正しました。
