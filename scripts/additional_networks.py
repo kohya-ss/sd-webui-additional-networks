@@ -101,6 +101,7 @@ class Script(scripts.Script):
                             )
 
                         weight.change(lambda w: (w, w), inputs=[weight], outputs=[weight_unet, weight_tenc])
+                        weight.release(lambda w: (w, w), inputs=[weight], outputs=[weight_unet, weight_tenc])
                         paste_params.append({"module": module, "model": model})
 
                     ctrls.extend((module, model, weight_unet, weight_tenc))

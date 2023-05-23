@@ -158,6 +158,10 @@ Composable LoRA はサブプロンプトごとに LoRA の適用有無を切り�
 
 ## Change History
 
+- 23 May 2023, 2023/5/23
+  - Fix an issue where the value of the `Weight` slider is not applied correctly.
+  - `Weight`のスライダーの値が正しく反映されない場合がある不具合への対応を行いました。
+  
 - 8 May 2023, 2023/5/8
   - Fix an issue where the models are not loaded correctly in the `Additional Networks` tab.
   - Fix an issue where `None` cannot be selected as a model in X/Y/Z plot.
