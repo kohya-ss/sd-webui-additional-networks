@@ -328,7 +328,7 @@ class Script(scripts.Script):
                     network.set_mask(i, None, shared=networks_shared)
 
         # count num of subprompts: does prompts have always same number of subprompts?
-        num_subprompts = 1 # default
+        num_subprompts = 1  # default
         prompts = kwargs.get("prompts", None)
         if prompts is not None:
             from modules import prompt_parser
@@ -401,7 +401,7 @@ class Script(scripts.Script):
             network.new_step_started(batch_size, num_sub_prompts, network_shared)
         if not self.has_mask:
             return  # no mask, run as usual with LoRA
-        
+
         self.org_batch_cond_uncond = shared.batch_cond_uncond
         shared.batch_cond_uncond = True  # force batch cond/uncond
 
@@ -464,10 +464,8 @@ class Script(scripts.Script):
         # (x, sampling_step, total_sampling_steps)
         # print("cfg_denoised_callback")
 
-        # repeat again
-        batch_size = self.batch_size
-
-        # modification to params doesn't affect caller... so remove conds from conds_list to align the number of conds with params.x
+        # modification to params doesn't affect caller... so remove conds from conds_list to align the number of conds with params.x with inpection(!!!)
+        
         # get conds_list from parent scope
         curframe = inspect.currentframe()
         calframe = inspect.getouterframes(curframe)
@@ -476,15 +474,11 @@ class Script(scripts.Script):
         conds_list = par_locals.get("conds_list", None)
 
         if conds_list is not None:
-            # set all member to (i,1)
+            # set all member to (i,1). length of conds_list is batch_size
             for i in range(len(conds_list)):
-                # conds = conds_list[i]
-                conds_list[i] = [(i, 1.0) for _ in range(batch_size)]
+                conds_list[i] = [(i, 1.0)]
         else:
             print("No 'conds_list' in the parent scope. Web UI might be different version.")
-
-        # subtract extra uncond in advance
-        # params.x[0] -= params.x[-1]
 
         # print(batch_size, num_sub_prompts, params.x.size(), params.sampling_step, params.total_sampling_steps)
 

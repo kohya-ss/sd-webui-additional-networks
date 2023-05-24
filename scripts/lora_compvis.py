@@ -160,15 +160,21 @@ class LoRAChainContainer:
 
 class LoRAChain:
     """
-    LoRAChain is a chain of LoRAModules.
+    LoRAChain is a chain of LoRAModules for the single Linear/Conv2d module.
     Call each LoRAModule in the chain in order with applying mask (regional) or for each sub-prompt (text encoder or not regional).
     """
 
     def __init__(
-        self, container: LoRAChainContainer, first_in_text_encoder: bool, lora_name: str, module: torch.nn.Module, is_text_encoder, will_be_merged=False
+        self,
+        container: LoRAChainContainer,
+        first_in_text_encoder: bool,
+        lora_name: str,
+        module: torch.nn.Module,
+        is_text_encoder,
+        will_be_merged=False,
     ):
         self.container = container
-        self.first_lora_in_text_encoder = first_in_text_encoder
+        self.first_lora_in_text_encoder = first_in_text_encoder  # increment sub prompt index if true
         self.lora_name = lora_name
         self.module = module
         self.is_text_encoder = is_text_encoder
@@ -238,6 +244,10 @@ class LoRAChain:
         # if no LoRA for this subprompt, do not apply LoRA
         if self.container.text_encoder_sub_prompt_index >= len(self.loras):
             return self.org_forward(x)
+        if self.container.text_encoder_sub_prompt_index < 0:
+            # in case of no LoRA for text encoder, sub_prompt_index is not incremented
+            return self.org_forward(x)
+
         lora = self.loras[self.container.text_encoder_sub_prompt_index]
         if lora is None:
             return self.org_forward(x)
@@ -245,7 +255,10 @@ class LoRAChain:
         return self.org_forward(x) + lora(x)
 
     def sub_prompt_forward(self, x):
-        assert not self.is_text_encoder and ("attn2_to_k" in self.lora_name or "attn2_to_v" in self.lora_name, "sub_prompt_forward is called for attn2_to_k/v")
+        assert not self.is_text_encoder and (
+            "attn2_to_k" in self.lora_name or "attn2_to_v" in self.lora_name,
+            "sub_prompt_forward is called for attn2_to_k/v",
+        )
 
         # doesn't use x
         cond_uncond = self.container.cond_uncond
