@@ -99,7 +99,7 @@ class LoRAChainContainer:
 
     def prepare_generation(self, num_sub_prompts: int):
         self.batch_size = 0  # not set yet
-        self.num_sub_prompts = num_sub_prompts  # splitted by " AND "
+        self.num_sub_prompts = num_sub_prompts  # split by " AND "
         self.text_encoder_sub_prompt_index = -1  # increment in first lora in text encoder
 
     def new_step_started(self, batch_size, num_sub_prompts):
@@ -710,7 +710,7 @@ class LoRANetworkCompvis(torch.nn.Module):
             sd["weight"] = weight
             lora_chains.get_module(lora_name).load_state_dict(sd)
 
-    # backup weights / fowards, replace MultiheadAttention for LoRA, add undecorator
+    # backup weights / forwards, replace MultiheadAttention for LoRA, add undecorator
     def prepare_applying(self, text_encoder, unet, merge_weights, device) -> List[LoRAChain]:
         mhas = []
         target_modules = []

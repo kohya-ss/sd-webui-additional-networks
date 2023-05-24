@@ -465,7 +465,7 @@ class Script(scripts.Script):
         # (x, sampling_step, total_sampling_steps)
         # print("cfg_denoised_callback")
 
-        # modification to params doesn't affect caller... so remove conds from conds_list to align the number of conds with params.x with inpection(!!!)
+        # modification to params doesn't affect caller... so remove conds from conds_list to align the number of conds with params.x with inspection(!!!)
         
         # get conds_list from parent scope
         curframe = inspect.currentframe()
