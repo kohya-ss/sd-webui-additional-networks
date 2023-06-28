@@ -311,6 +311,12 @@ def find_closest_lora_model_name(search: str):
 def update_models():
     global lora_models, lora_model_names, legacy_model_names
     paths = [lora_models_dir]
+    if os.path.exists(shared.cmd_opts.lora_dir):
+        paths.append(shared.cmd_opts.lora_dir)
+    for folder_path in glob.iglob(os.path.join(shared.cmd_opts.data_dir, '*/models/Lora')):
+        paths.append(folder_path)
+    for folder_path in glob.iglob(os.path.join(shared.cmd_opts.data_dir, '*/*/models/Lora')):
+        paths.append(folder_path)
     extra_lora_paths = util.split_path_list(shared.opts.data.get("additional_networks_extra_lora_path", ""))
     for path in extra_lora_paths:
         path = path.lstrip()
