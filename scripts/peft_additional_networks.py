@@ -203,6 +203,7 @@ class Script(scripts.Script):
 
         if isinstance(unet, PeftModel):
             unet.unload()
+            print("here")
         if isinstance(text_encoder, PeftModel):
             text_encoder.unload()
 
