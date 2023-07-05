@@ -40,10 +40,13 @@ def load_lora_model(unet, text_encoder, lora_path, adapter_name):
         if not hasattr(unet, "config"):
             setattr(unet, "config", {})
         unet = get_peft_model(unet, unet_peft_config, adapter_name)
+        print(get_peft_model_state_dict(unet).keys())
         if convert_text_encoder:
             if not hasattr(text_encoder, "config"):
                 setattr(text_encoder, "config", {})
             text_encoder = get_peft_model(text_encoder, text_encoder_peft_config, adapter_name)
+            print(get_peft_model_state_dict(text_encoder).keys())
+
     set_peft_model_state_dict(unet, state_dict, adapter_name=adapter_name)
     if convert_text_encoder:
         set_peft_model_state_dict(text_encoder, state_dict, adapter_name=adapter_name)
