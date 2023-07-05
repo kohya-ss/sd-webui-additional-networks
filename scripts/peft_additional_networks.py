@@ -269,6 +269,7 @@ class Script(scripts.Script):
             peft_lora.create_weighted_lora_adapter(
                 unet, text_encoder, adapters, unet_weights, te_weights, weighted_adapter_name
             )
+            print(list(unet.peft_config.keys()))
         print(f"{unet=}")
         print(f"{text_encoder=}")
 
