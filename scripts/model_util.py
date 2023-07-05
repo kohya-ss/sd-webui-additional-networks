@@ -14,7 +14,9 @@ import modules.scripts as scripts
 
 
 # MAX_MODEL_COUNT = shared.cmd_opts.addnet_max_model_count or 5
-MAX_MODEL_COUNT = shared.cmd_opts.addnet_max_model_count if hasattr(shared.cmd_opts, "addnet_max_model_count") else 5
+MAX_MODEL_COUNT = (
+    shared.cmd_opts.addnet_max_model_count if hasattr(shared.cmd_opts, "peft_addnet_max_model_count") else 5
+)
 LORA_MODEL_EXTS = [".pt", ".ckpt", ".safetensors"]
 re_legacy_hash = re.compile("\(([0-9a-f]{8})\)$")  # matches 8-character hashes, new hash has 12 characters
 lora_models = {}  # "My_Lora(abcdef123456)" -> "C:/path/to/model.safetensors"
@@ -233,7 +235,9 @@ def get_all_models(paths, sort_by, filter_by):
         data = sorted(data, key=lambda x: get_model_rating(x["fileinfo"][0]), reverse=True)
     elif sort_by == "has user metadata":
         data = sorted(
-            data, key=lambda x: os.path.basename(x["fileinfo"][0]) if has_user_metadata(x["fileinfo"][0]) else "", reverse=True
+            data,
+            key=lambda x: os.path.basename(x["fileinfo"][0]) if has_user_metadata(x["fileinfo"][0]) else "",
+            reverse=True,
         )
 
     reverse = shared.opts.data.get("additional_networks_reverse_sort_order", False)
