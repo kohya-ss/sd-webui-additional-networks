@@ -261,7 +261,7 @@ def convert_text_enc_state_dict(text_enc_dict):
     return text_enc_dict
 
 
-def convert_hf_to_compvis(hf_lora_state_dict, add_wrapped=False):
+def convert_hf_to_compvis(hf_lora_state_dict, add_wrapped=True):
     # for converting a HF Diffusers/lora saved pipeline to a Stable Diffusion checkpoint.
     # *Only* converts the UNet, VAE, and Text Encoder.
     # Does not convert optimizer state or any other thing.
