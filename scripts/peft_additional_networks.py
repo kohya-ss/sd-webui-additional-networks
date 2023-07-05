@@ -202,10 +202,9 @@ class Script(scripts.Script):
         text_encoder = sd_model.cond_stage_model
 
         if isinstance(unet, PeftModel):
-            unet.unload()
-            print("here")
+            unet.unload(merge=False)
         if isinstance(text_encoder, PeftModel):
-            text_encoder.unload()
+            text_encoder.unload(merge=False)
 
     def process_batch(self, p, *args, **kwargs):
         unet = p.sd_model.model.diffusion_model
