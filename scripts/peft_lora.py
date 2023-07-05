@@ -11,7 +11,7 @@ def load_lora_model(unet, text_encoder, lora_path, adapter_name):
     with safetensors.safe_open(lora_path, framework="pt", device="cpu") as f:
         metadata = f.metadata()
         r = int(metadata["r"])
-        lora_alpha = int(metadata["lora_alpha"])
+        lora_alpha = float(metadata["lora_alpha"])
         unet_target_modules = metadata["unet_target_modules"].split(",")
         if "text_encoder_target_modules" in metadata:
             convert_text_encoder = True
