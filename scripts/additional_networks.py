@@ -52,7 +52,7 @@ class Script(scripts.Script):
         self.paste_field_names = []
 
         with gr.Group():
-            with gr.Accordion("Additional Networks", open=False):
+            with gr.Accordion("PEFT LoRA Networks", open=False):
                 with gr.Row():
                     enabled = gr.Checkbox(label="Enable", value=False)
                     ctrls.append(enabled)
