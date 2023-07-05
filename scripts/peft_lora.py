@@ -347,3 +347,4 @@ def delete_lora_adapter(unet, text_encoder, adapter_name):
     unet.delete_adapter(adapter_name)
     if isinstance(text_encoder, PeftModel):
         text_encoder.delete_adapter(adapter_name)
+        print(text_encoder)

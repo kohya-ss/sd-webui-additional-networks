@@ -270,8 +270,8 @@ class Script(scripts.Script):
             peft_lora.create_weighted_lora_adapter(
                 unet, text_encoder, adapters, unet_weights, te_weights, weighted_adapter_name
             )
-        print(f"{unet=}")
-        print(f"{text_encoder=}")
+        # print(f"{unet=}")
+        # print(f"{text_encoder=}")
 
         self.set_infotext_fields(p, self.latest_params)
 
