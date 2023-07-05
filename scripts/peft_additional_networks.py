@@ -250,7 +250,8 @@ class Script(scripts.Script):
             unet_weights.append(weight_unet)
             te_weights.append(weight_tenc)
             adapters.append(adapter_name)
-            print(list(unet.peft_config.keys()))
+            if isinstance(unet, PeftModel):
+                print(list(unet.peft_config.keys()))
             unet, text_encoder = peft_lora.load_lora_model(unet, text_encoder, model_path, adapter_name)
 
         if len(unet_weights) > 0:
