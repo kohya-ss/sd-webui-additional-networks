@@ -254,7 +254,9 @@ class Script(scripts.Script):
             print(f"{text_encoder=}")
 
         if len(unet_weights) > 0:
-            weighted_adapter_name = "_".join([f"{a}:{w}" for w, a in zip(unet_weights, adapters)])
+            weighted_adapter_name = "_".join(
+                [f"{a}:{str(w).replace('.', '')}" for w, a in zip(unet_weights, adapters)]
+            )
             if weighted_adapter_name in unet.peft_config:
                 return
             adapters_to_remove = [
