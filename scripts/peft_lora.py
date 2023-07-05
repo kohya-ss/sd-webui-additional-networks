@@ -351,8 +351,10 @@ def load_lora_model(unet, text_encoder, lora_path, adapter_name):
 
 def create_weighted_lora_adapter(unet, text_encoder, adapters, unet_weights, te_weights, adapter_name):
     unet.add_weighted_adapter(adapters, unet_weights, adapter_name)
+    unet.set_adapter(adapter_name)
     if isinstance(text_encoder, PeftModel):
         text_encoder.add_weighted_adapter(adapters, te_weights, adapter_name)
+        text_encoder.set_adapter(adapter_name)
 
 
 def delete_lora_adapter(unet, text_encoder, adapter_name):
