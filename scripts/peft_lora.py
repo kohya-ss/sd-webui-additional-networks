@@ -47,6 +47,7 @@ def load_lora_model(unet, text_encoder, lora_path, adapter_name):
     set_peft_model_state_dict(unet, state_dict, adapter_name=adapter_name)
     if convert_text_encoder:
         set_peft_model_state_dict(text_encoder, state_dict, adapter_name=adapter_name)
+    return unet, text_encoder
 
 
 def create_weighted_lora_adapter(unet, text_encoder, adapters, unet_weights, te_weights, adapter_name):

@@ -249,7 +249,9 @@ class Script(scripts.Script):
             unet_weights.append(weight_unet)
             te_weights.append(weight_tenc)
             adapters.append(adapter_name)
-            peft_lora.load_lora_model(unet, text_encoder, model_path, adapter_name)
+            unet, text_encoder = peft_lora.load_lora_model(unet, text_encoder, model_path, adapter_name)
+            print(f"{unet=}")
+            print(f"{text_encoder=}")
 
         if len(unet_weights) > 0:
             weighted_adapter_name = "_".join([f"{a}:{w}" for w, a in zip(unet_weights, adapters)])
