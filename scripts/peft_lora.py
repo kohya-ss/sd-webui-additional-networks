@@ -292,7 +292,7 @@ def convert_hf_to_compvis(hf_lora_state_dict, add_wrapped=True):
 
 def load_lora_model(unet, text_encoder, lora_path, adapter_name):
     if isinstance(unet, PeftModel) and adapter_name in unet.peft_config:
-        return
+        return unet, text_encoder
     convert_text_encoder = False
     with safetensors.safe_open(lora_path, framework="pt", device="cpu") as f:
         metadata = f.metadata()

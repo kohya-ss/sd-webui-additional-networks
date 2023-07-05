@@ -202,16 +202,19 @@ class Script(scripts.Script):
         text_encoder = sd_model.cond_stage_model
 
         if isinstance(unet, PeftModel):
-            unet.unload(merge=False)
+            unet = unet.unload()
         if isinstance(text_encoder, PeftModel):
-            text_encoder.unload(merge=False)
+            text_encoder = text_encoder.unload()
+        return unet, text_encoder
 
     def process_batch(self, p, *args, **kwargs):
         unet = p.sd_model.model.diffusion_model
         text_encoder = p.sd_model.cond_stage_model
 
         if not args[0]:
-            self.restore_networks(p.sd_model)
+            unet, text_encoder = self.restore_networks(p.sd_model)
+            p.sd_model.model.diffusion_model = unet
+            p.sd_model.model.cond_stage_model = text_encoder
             return
 
         params = []
@@ -249,9 +252,9 @@ class Script(scripts.Script):
             unet_weights.append(weight_unet)
             te_weights.append(weight_tenc)
             adapters.append(adapter_name)
-            if isinstance(unet, PeftModel):
-                print(list(unet.peft_config.keys()))
             unet, text_encoder = peft_lora.load_lora_model(unet, text_encoder, model_path, adapter_name)
+            p.sd_model.model.diffusion_model = unet
+            p.sd_model.model.cond_stage_model = text_encoder
 
         if len(unet_weights) > 0:
             weighted_adapter_name = "_".join(
