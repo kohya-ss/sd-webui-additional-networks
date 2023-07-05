@@ -267,6 +267,7 @@ class Script(scripts.Script):
             ]
             for remove_adapter in adapters_to_remove:
                 peft_lora.delete_lora_adapter(unet, text_encoder, remove_adapter)
+                print(f"{text_encoder=}")
             peft_lora.create_weighted_lora_adapter(
                 unet, text_encoder, adapters, unet_weights, te_weights, weighted_adapter_name
             )
