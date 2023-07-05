@@ -265,16 +265,11 @@ class Script(scripts.Script):
             adapters_to_remove = [
                 adapter_name for adapter_name in list(unet.peft_config.keys()) if adapter_name not in adapters
             ]
-            print(adapters_to_remove)
-            print(adapters)
-            print(list(unet.peft_config.keys()))
-            print([adapter_name in unet.peft_config.keys()])
             for remove_adapter in adapters_to_remove:
                 peft_lora.delete_lora_adapter(unet, text_encoder, remove_adapter)
             peft_lora.create_weighted_lora_adapter(
                 unet, text_encoder, adapters, unet_weights, te_weights, weighted_adapter_name
             )
-            print(list(unet.peft_config.keys()))
         print(f"{unet=}")
         print(f"{text_encoder=}")
 

@@ -319,7 +319,6 @@ def load_lora_model(unet, text_encoder, lora_path, adapter_name):
     state_dict = convert_hf_to_compvis(state_dict)
 
     if isinstance(unet, PeftModel):
-        print("in if")
         unet.add_adapter(adapter_name, unet_peft_config)
         if convert_text_encoder:
             text_encoder.add_adapter(adapter_name, text_encoder_peft_config)
