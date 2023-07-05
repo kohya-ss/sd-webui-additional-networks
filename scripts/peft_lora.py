@@ -261,7 +261,7 @@ def convert_text_enc_state_dict(text_enc_dict):
     return text_enc_dict
 
 
-def convert_hf_to_compvis(hf_lora_state_dict, add_wrapped=True):
+def convert_hf_to_compvis(hf_lora_state_dict, add_wrapped=False):
     # for converting a HF Diffusers/lora saved pipeline to a Stable Diffusion checkpoint.
     # *Only* converts the UNet, VAE, and Text Encoder.
     # Does not convert optimizer state or any other thing.
@@ -292,6 +292,13 @@ def convert_hf_to_compvis(hf_lora_state_dict, add_wrapped=True):
 
 def load_lora_model(unet, text_encoder, lora_path, adapter_name):
     convert_text_encoder = False
+    if (
+        isinstance(unet, PeftModel)
+        and isinstance(text_encoder, PeftModel)
+        and adapter_name in unet.peft_config
+        and adapter_name in text_encoder.peft_config
+    ):
+        return unet, text_encoder
 
     with safetensors.safe_open(lora_path, framework="pt", device="cpu") as f:
         metadata = f.metadata()
