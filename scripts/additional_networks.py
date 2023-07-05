@@ -10,8 +10,10 @@ import gradio as gr
 import modules.ui
 from modules.ui_components import ToolButton, FormRow
 
-from scripts import addnet_xyz_grid_support, lora_compvis, model_util, metadata_editor
+from scripts import addnet_xyz_grid_support, peft_lora, lora_compvis, model_util, metadata_editor
 from scripts.model_util import lora_models, MAX_MODEL_COUNT
+
+from peft import PeftModel
 
 
 memo_symbol = "\U0001F4DD"  # 📝
@@ -21,7 +23,7 @@ addnet_paste_params = {"txt2img": [], "img2img": []}
 class Script(scripts.Script):
     def __init__(self) -> None:
         super().__init__()
-        self.latest_params = [(None, None, None, None)] * MAX_MODEL_COUNT
+        self.latest_params = [(None, None, None, None, None)] * MAX_MODEL_COUNT
         self.latest_networks = []
         self.latest_model_hash = ""
 
@@ -65,6 +67,8 @@ class Script(scripts.Script):
                         model = gr.Dropdown(list(lora_models.keys()), label=f"Model {i+1}", value="None")
                         with gr.Row(visible=False):
                             model_path = gr.Textbox(value="None", interactive=False, visible=False)
+                        with gr.Row(visible=True):
+                            adapter_name = gr.Textbox(value=f"lora_{i}", visible=True)
                         model.change(
                             lambda module, model, i=i: model_util.lora_models.get(model, "None"),
                             inputs=[module, model],
@@ -75,8 +79,12 @@ class Script(scripts.Script):
                         # gradio since this button will exit the gr.Blocks context by the
                         # time the metadata editor tab is created, so event handlers can't
                         # be registered on it by then.
-                        model_info = ToolButton(value=memo_symbol, elem_id=f"additional_networks_send_to_metadata_editor_{i}")
-                        model_info.click(fn=None, _js="addnet_send_to_metadata_editor", inputs=[module, model_path], outputs=[])
+                        model_info = ToolButton(
+                            value=memo_symbol, elem_id=f"additional_networks_send_to_metadata_editor_{i}"
+                        )
+                        model_info.click(
+                            fn=None, _js="addnet_send_to_metadata_editor", inputs=[module, model_path], outputs=[]
+                        )
 
                         module.change(
                             lambda module, model, i=i: addnet_xyz_grid_support.update_axis_params(i, module, model),
@@ -92,20 +100,32 @@ class Script(scripts.Script):
                         # perhaps there is no user to train Text Encoder only, Weight A is U-Net
                         # The name of label will be changed in future (Weight A and B), but UNet and TEnc for now for easy understanding
                         with gr.Column() as col:
-                            weight = gr.Slider(label=f"Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=0.05, visible=True)
+                            weight = gr.Slider(
+                                label=f"Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=0.05, visible=True
+                            )
                             weight_unet = gr.Slider(
-                                label=f"UNet Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=0.05, visible=False
+                                label=f"UNet Weight {i+1}",
+                                value=1.0,
+                                minimum=-1.0,
+                                maximum=2.0,
+                                step=0.05,
+                                visible=False,
                             )
                             weight_tenc = gr.Slider(
-                                label=f"TEnc Weight {i+1}", value=1.0, minimum=-1.0, maximum=2.0, step=0.05, visible=False
+                                label=f"TEnc Weight {i+1}",
+                                value=1.0,
+                                minimum=-1.0,
+                                maximum=2.0,
+                                step=0.05,
+                                visible=False,
                             )
 
                         weight.change(lambda w: (w, w), inputs=[weight], outputs=[weight_unet, weight_tenc])
                         weight.release(lambda w: (w, w), inputs=[weight], outputs=[weight_unet, weight_tenc])
                         paste_params.append({"module": module, "model": model})
 
-                    ctrls.extend((module, model, weight_unet, weight_tenc))
-                    weight_sliders.extend((weight, weight_unet, weight_tenc))
+                    ctrls.extend((module, model, weight_unet, weight_tenc, adapter_name))
+                    weight_sliders.extend((weight, weight_unet, weight_tenc, adapter_name))
                     model_dropdowns.append(model)
 
                     self.infotext_fields.extend(
@@ -115,6 +135,7 @@ class Script(scripts.Script):
                             (weight, f"AddNet Weight {i+1}"),
                             (weight_unet, f"AddNet Weight A {i+1}"),
                             (weight_tenc, f"AddNet Weight B {i+1}"),
+                            (adapter_name, f"AddNet Model Name {i+1}"),
                         ]
                     )
 
@@ -132,7 +153,9 @@ class Script(scripts.Script):
                         updates.append(gr.Slider.update(visible=separate, value=w_tenc))  # TEnc
                     return updates
 
-                separate_weights.change(update_weight_sliders, inputs=[separate_weights] + weight_sliders, outputs=weight_sliders)
+                separate_weights.change(
+                    update_weight_sliders, inputs=[separate_weights] + weight_sliders, outputs=weight_sliders
+                )
 
                 def refresh_all_models(*dropdowns):
                     model_util.update_models()
@@ -160,7 +183,7 @@ class Script(scripts.Script):
 
     def set_infotext_fields(self, p, params):
         for i, t in enumerate(params):
-            module, model, weight_unet, weight_tenc = t
+            module, model, weight_unet, weight_tenc, adapter_name = t
             if model is None or model == "None" or len(model) == 0 or (weight_unet == 0 and weight_tenc == 0):
                 continue
             p.extra_generation_params.update(
@@ -170,6 +193,7 @@ class Script(scripts.Script):
                     f"AddNet Model {i+1}": model,
                     f"AddNet Weight A {i+1}": weight_unet,
                     f"AddNet Weight B {i+1}": weight_tenc,
+                    f"AddNet Model Name {i+1}": adapter_name,
                 }
             )
 
@@ -177,11 +201,10 @@ class Script(scripts.Script):
         unet = sd_model.model.diffusion_model
         text_encoder = sd_model.cond_stage_model
 
-        if len(self.latest_networks) > 0:
-            print("restoring last networks")
-            for network, _ in self.latest_networks[::-1]:
-                network.restore(text_encoder, unet)
-            self.latest_networks.clear()
+        if isinstance(unet, PeftModel):
+            unet.unload()
+        if isinstance(text_encoder, PeftModel):
+            text_encoder.unload()
 
     def process_batch(self, p, *args, **kwargs):
         unet = p.sd_model.model.diffusion_model
@@ -193,85 +216,53 @@ class Script(scripts.Script):
 
         params = []
         for i, ctrl in enumerate(args[2:]):
-            if i % 4 == 0:
+            if i % 5 == 0:
                 param = [ctrl]
             else:
                 param.append(ctrl)
-                if i % 4 == 3:
+                if i % 5 == 4:
                     params.append(param)
+        self.latest_params = params
 
-        models_changed = len(self.latest_networks) == 0  # no latest network (cleared by check-off)
-        models_changed = models_changed or self.latest_model_hash != p.sd_model.sd_model_hash
-        if not models_changed:
-            for (l_module, l_model, l_weight_unet, l_weight_tenc), (module, model, weight_unet, weight_tenc) in zip(
-                self.latest_params, params
-            ):
-                if l_module != module or l_model != model or l_weight_unet != weight_unet or l_weight_tenc != weight_tenc:
-                    models_changed = True
-                    break
+        unet_weights = []
+        te_weights = []
+        adapters = []
 
-        if models_changed:
-            self.restore_networks(p.sd_model)
-            self.latest_params = params
-            self.latest_model_hash = p.sd_model.sd_model_hash
+        for module, model, weight_unet, weight_tenc, adapter_name in self.latest_params:
+            if model is None or model == "None" or len(model) == 0:
+                continue
 
-            for module, model, weight_unet, weight_tenc in self.latest_params:
-                if model is None or model == "None" or len(model) == 0:
-                    continue
-                if weight_unet == 0 and weight_tenc == 0:
-                    print(f"ignore because weight is 0: {model}")
-                    continue
+            if weight_unet == 0 and weight_tenc == 0:
+                print(f"ignore because weight is 0: {model}")
+                continue
 
-                model_path = lora_models.get(model, None)
-                if model_path is None:
-                    raise RuntimeError(f"model not found: {model}")
+            model_path = lora_models.get(model, None)
+            if model_path is None:
+                raise RuntimeError(f"model not found: {model}")
+            if model_path.startswith('"') and model_path.endswith('"'):  # trim '"' at start/end
+                model_path = model_path[1:-1]
+            if not os.path.exists(model_path):
+                print(f"file not found: {model_path}")
+                continue
 
-                if model_path.startswith('"') and model_path.endswith('"'):  # trim '"' at start/end
-                    model_path = model_path[1:-1]
-                if not os.path.exists(model_path):
-                    print(f"file not found: {model_path}")
-                    continue
+            print(f"{module} weight_unet: {weight_unet}, weight_tenc: {weight_tenc}, model: {model}")
+            unet_weights.append(weight_unet)
+            te_weights.append(weight_tenc)
+            adapters.append(adapter_name)
+            peft_lora.load_lora_model(unet, text_encoder, model_path, adapter_name)
 
-                print(f"{module} weight_unet: {weight_unet}, weight_tenc: {weight_tenc}, model: {model}")
-                if module == "LoRA":
-                    if os.path.splitext(model_path)[1] == ".safetensors":
-                        from safetensors.torch import load_file
-
-                        du_state_dict = load_file(model_path)
-                    else:
-                        du_state_dict = torch.load(model_path, map_location="cpu")
-
-                    network, info = lora_compvis.create_network_and_apply_compvis(
-                        du_state_dict, weight_tenc, weight_unet, text_encoder, unet
-                    )
-                    # in medvram, device is different for u-net and sd_model, so use sd_model's
-                    network.to(p.sd_model.device, dtype=p.sd_model.dtype)
-
-                    print(f"LoRA model {model} loaded: {info}")
-                    self.latest_networks.append((network, model))
-            if len(self.latest_networks) > 0:
-                print("setting (or sd model) changed. new networks created.")
-
-        # apply mask: currently only top 3 networks are supported
-        if len(self.latest_networks) > 0:
-            mask_image = args[-2]
-            if mask_image is not None:
-                mask_image = mask_image.astype(np.float32) / 255.0
-                print(f"use mask image to control LoRA regions.")
-                for i, (network, model) in enumerate(self.latest_networks[:3]):
-                    if not hasattr(network, "set_mask"):
-                        continue
-                    mask = mask_image[:, :, i]  # R,G,B
-                    if mask.max() <= 0:
-                        continue
-                    mask = torch.tensor(mask, dtype=p.sd_model.dtype, device=p.sd_model.device)
-
-                    network.set_mask(mask, height=p.height, width=p.width, hr_height=p.hr_upscale_to_y, hr_width=p.hr_upscale_to_x)
-                    print(f"apply mask. channel: {i}, model: {model}")
-            else:
-                for network, _ in self.latest_networks:
-                    if hasattr(network, "set_mask"):
-                        network.set_mask(None)
+        if len(unet_weights) > 0:
+            weighted_adapter_name = "_".join([f"{a}:{w}" for w, a in zip(unet_weights, adapters)])
+            if weighted_adapter_name in unet.peft_config:
+                return
+            adapters_to_remove = [
+                adapter_name for adapter_name in unet.peft_config.keys() if adapter_name not in adapters
+            ]
+            for remove_adapter in adapters_to_remove:
+                peft_lora.delete_lora_adapter(unet, text_encoder, remove_adapter)
+            peft_lora.create_weighted_lora_adapter(
+                unet, text_encoder, adapters, unet_weights, te_weights, weighted_adapter_name
+            )
 
         self.set_infotext_fields(p, self.latest_params)
 
@@ -332,7 +323,9 @@ def on_ui_settings():
     )
     shared.opts.add_option(
         "additional_networks_back_up_model_when_saving",
-        shared.OptionInfo(True, "Make a backup copy of the model being edited when saving its metadata.", section=section),
+        shared.OptionInfo(
+            True, "Make a backup copy of the model being edited when saving its metadata.", section=section
+        ),
     )
     shared.opts.add_option(
         "additional_networks_show_only_safetensors",
@@ -352,7 +345,8 @@ def on_ui_settings():
         "additional_networks_max_top_tags", shared.OptionInfo(20, "Max number of top tags to show", section=section)
     )
     shared.opts.add_option(
-        "additional_networks_max_dataset_folders", shared.OptionInfo(20, "Max number of dataset folders to show", section=section)
+        "additional_networks_max_dataset_folders",
+        shared.OptionInfo(20, "Max number of dataset folders to show", section=section),
     )
 
 
