@@ -210,6 +210,7 @@ class Script(scripts.Script):
     def process_batch(self, p, *args, **kwargs):
         unet = p.sd_model.model.diffusion_model
         text_encoder = p.sd_model.cond_stage_model
+        print(text_encoder)
 
         if not args[0]:
             unet, text_encoder = self.restore_networks(p.sd_model)
