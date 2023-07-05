@@ -291,9 +291,8 @@ def convert_hf_to_compvis(hf_lora_state_dict, add_wrapped=True):
 
 
 def load_lora_model(unet, text_encoder, lora_path, adapter_name):
-    if isinstance(unet, PeftModel) and adapter_name in unet.peft_config:
-        return unet, text_encoder
     convert_text_encoder = False
+
     with safetensors.safe_open(lora_path, framework="pt", device="cpu") as f:
         metadata = f.metadata()
         r = int(metadata["r"])
@@ -302,12 +301,29 @@ def load_lora_model(unet, text_encoder, lora_path, adapter_name):
         if "text_encoder_target_modules" in metadata:
             convert_text_encoder = True
             text_encoder_target_modules = metadata["text_encoder_target_modules"].split(",")
+
+    if not isinstance(unet, PeftModel) or not isinstance(text_encoder, PeftModel):
+        state_dict = load_file(lora_path)
+        state_dict = convert_hf_to_compvis(state_dict)
+
     unet_peft_config = LoraConfig(
         inference_mode=True,
         r=r,
         lora_alpha=lora_alpha,
         target_modules=unet_target_modules,
     )
+
+    # unet
+    if not isinstance(unet, PeftModel):
+        if not hasattr(unet, "config"):
+            setattr(unet, "config", {})
+        unet = get_peft_model(unet, unet_peft_config, adapter_name)
+        set_peft_model_state_dict(unet, state_dict, adapter_name=adapter_name)
+    elif adapter_name not in unet.peft_config:
+        unet.add_adapter(adapter_name, unet_peft_config)
+        set_peft_model_state_dict(unet, state_dict, adapter_name=adapter_name)
+
+    # te
     if convert_text_encoder:
         text_encoder_peft_config = LoraConfig(
             inference_mode=True,
@@ -315,25 +331,14 @@ def load_lora_model(unet, text_encoder, lora_path, adapter_name):
             lora_alpha=lora_alpha,
             target_modules=text_encoder_target_modules,
         )
-    state_dict = load_file(lora_path)
-    state_dict = convert_hf_to_compvis(state_dict)
-
-    if isinstance(unet, PeftModel):
-        unet.add_adapter(adapter_name, unet_peft_config)
-        if convert_text_encoder:
-            text_encoder.add_adapter(adapter_name, text_encoder_peft_config)
-    else:
-        if not hasattr(unet, "config"):
-            setattr(unet, "config", {})
-        unet = get_peft_model(unet, unet_peft_config, adapter_name)
-        if convert_text_encoder:
+        if not isinstance(text_encoder, PeftModel):
             if not hasattr(text_encoder, "config"):
                 setattr(text_encoder, "config", {})
             text_encoder = get_peft_model(text_encoder, text_encoder_peft_config, adapter_name)
-
-    set_peft_model_state_dict(unet, state_dict, adapter_name=adapter_name)
-    if convert_text_encoder:
-        set_peft_model_state_dict(text_encoder, state_dict, adapter_name=adapter_name)
+            set_peft_model_state_dict(text_encoder, state_dict, adapter_name=adapter_name)
+        elif adapter_name not in text_encoder.peft_config:
+            text_encoder.add_adapter(adapter_name, text_encoder_peft_config)
+            set_peft_model_state_dict(text_encoder, state_dict, adapter_name=adapter_name)
     return unet, text_encoder
 
 
@@ -347,4 +352,3 @@ def delete_lora_adapter(unet, text_encoder, adapter_name):
     unet.delete_adapter(adapter_name)
     if isinstance(text_encoder, PeftModel):
         text_encoder.delete_adapter(adapter_name)
-        print(text_encoder)
