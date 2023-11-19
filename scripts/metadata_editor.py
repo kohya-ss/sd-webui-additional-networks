@@ -396,7 +396,7 @@ def setup_ui(addnet_paste_params):
     """
     can_edit = False
 
-    with gr.Row().style(equal_height=False):
+    with gr.Row(equal_height=True):
         # Lefthand column
         with gr.Column(variant="panel"):
             # Module and model selector
@@ -525,7 +525,8 @@ def setup_ui(addnet_paste_params):
                     interactive=can_edit,
                     type="pil",
                     image_mode="RGBA",
-                ).style(height=480)
+                    height=480
+                )
 
             # Image parameters
             with gr.Accordion("Image Parameters", open=False):
