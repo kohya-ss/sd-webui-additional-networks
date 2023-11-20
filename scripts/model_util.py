@@ -22,7 +22,7 @@ lora_models = {}  # "My_Lora(abcdef123456)" -> "C:/path/to/model.safetensors"
 lora_model_names = {}  # "my_lora" -> "My_Lora(My_Lora(abcdef123456)"
 legacy_model_names = {}
 lora_path = str(Path(scripts.basedir()).parent.parent)
-lora_models_dir = os.path.join(lora_path, "models/lora")
+lora_models_dir = os.path.join(lora_path, "models/Lora")
 os.makedirs(lora_models_dir, exist_ok=True)
 
 def is_safetensors(filename):
