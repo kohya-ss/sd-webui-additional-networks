@@ -7,6 +7,7 @@ import stat
 import tqdm
 from collections import OrderedDict
 from multiprocessing.pool import ThreadPool as Pool
+from pathlib import Path
 
 from modules import shared, sd_models, hashes
 from scripts import safetensors_hack, model_util, util
@@ -20,9 +21,9 @@ re_legacy_hash = re.compile("\(([0-9a-f]{8})\)$")  # matches 8-character hashes,
 lora_models = {}  # "My_Lora(abcdef123456)" -> "C:/path/to/model.safetensors"
 lora_model_names = {}  # "my_lora" -> "My_Lora(My_Lora(abcdef123456)"
 legacy_model_names = {}
-lora_models_dir = os.path.join(scripts.basedir(), "models/lora")
+lora_path = str(Path(scripts.basedir()).parent.parent)
+lora_models_dir = os.path.join(lora_path, "models/Lora")
 os.makedirs(lora_models_dir, exist_ok=True)
-
 
 def is_safetensors(filename):
     return os.path.splitext(filename)[1] == ".safetensors"
