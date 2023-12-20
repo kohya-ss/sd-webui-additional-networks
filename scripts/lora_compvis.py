@@ -154,12 +154,15 @@ def create_network_and_apply_compvis(du_state_dict, multiplier_tenc, multiplier_
     state_dict = network.apply_lora_modules(du_state_dict)  # some weights are applied to text encoder
     network.to(dtype)  # with this, if error comes from next line, the model will be used
     info = network.load_state_dict(state_dict, strict=False)
+    network.fuse_lora()
 
     # remove redundant warnings
     if len(info.missing_keys) > 4:
         missing_keys = []
         alpha_count = 0
         for key in info.missing_keys:
+            if "org_module" in key:
+                continue
             if "alpha" not in key:
                 missing_keys.append(key)
             else:
@@ -317,6 +320,24 @@ class LoRANetworkCompvis(torch.nn.Module):
 
         return new_sd
 
+    def calculate_weight(self, lora_module: LoRAModule, weight):
+        down_weight = lora_module.lora_down.weight.data.cuda().float().flatten(start_dim=1)
+        up_weight = lora_module.lora_up.weight.data.cuda().float().flatten(start_dim=1)
+        lora_weight = torch.mm(up_weight, down_weight) * lora_module.scale * lora_module.multiplier
+        lora_weight = lora_weight.to(weight.device, weight.dtype).reshape_as(weight)
+        return weight + lora_weight
+
+
+    def fuse_lora(self):
+        for name, submodule in self.named_modules():
+            if not isinstance(submodule, LoRAModule):
+                continue
+            if hasattr(submodule, "fused") and submodule.fused:
+                continue
+            new_weight = self.calculate_weight(submodule, submodule.org_module.weight.data)
+            submodule.org_module.weight.data.copy_(new_weight)
+            submodule.fused = True
+
     def __init__(self, text_encoder, unet, multiplier_tenc=1.0, multiplier_unet=1.0, modules_dim=None, modules_alpha=None) -> None:
         super().__init__()
         self.multiplier_unet = multiplier_unet
@@ -352,6 +373,7 @@ class LoRANetworkCompvis(torch.nn.Module):
                         if child_module.__class__.__name__ == "Linear" or child_module.__class__.__name__ == "Conv2d":
                             lora_name = prefix + "." + name + "." + child_name
                             lora_name = lora_name.replace(".", "_")
+                            lora_name = lora_name.replace("_deployable_module_model__torch_module_", "")
                             if "_resblocks_23_" in lora_name:  # ignore last block in StabilityAi Text Encoder
                                 break
                             if lora_name not in comp_vis_loras_dim_alpha:
@@ -405,6 +427,7 @@ class LoRANetworkCompvis(torch.nn.Module):
                     backed_up = True
             elif not hasattr(rep_module, "_lora_org_forward"):
                 rep_module._lora_org_forward = rep_module.forward
+                rep_module._lora_org_weights = rep_module.weight.detach().clone().cpu()
                 backed_up = True
         if backed_up:
             print("original forward/weights is backed up.")
@@ -424,12 +447,14 @@ class LoRANetworkCompvis(torch.nn.Module):
         for module in modules:
             if hasattr(module, "_lora_org_forward"):
                 module.forward = module._lora_org_forward
+                module.fused = False
                 del module._lora_org_forward
                 restored = True
             if hasattr(
                 module, "_lora_org_weights"
             ):  # module doesn't have forward and weights at same time currently, but supports it for future changing
-                module.load_state_dict(module._lora_org_weights)
+                module.weight.data.copy_(module._lora_org_weights)
+                module.fused = False
                 del module._lora_org_weights
                 restored = True
 
@@ -467,7 +492,6 @@ class LoRANetworkCompvis(torch.nn.Module):
         mha_loras = {}
         for lora in self.text_encoder_loras + self.unet_loras:
             if type(lora) == LoRAModule:
-                lora.apply_to()  # ensure remove reference to original Linear: reference makes key of state_dict
                 self.add_module(lora.lora_name, lora)
             else:
                 # SD2.x MultiheadAttention merge weights to MHA weights
